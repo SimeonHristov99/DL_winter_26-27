@@ -1,0 +1,56 @@
+#!/bin/sh
+
+## Linting
+printf "\n%s\n" "Pre-push hook activated."
+printf "%s\n" "Linting..."
+ruff check . --fix
+ruff_status=$?
+if [ "$ruff_status" -ne 0 ]; then
+    printf "%s\n" "❌ Ruff checks failed."
+    exit "$ruff_status"
+fi
+ruff format .
+ruff_status=$?
+if [ "$ruff_status" -ne 0 ]; then
+    printf "%s\n" "❌ Ruff formatting failed."
+    exit "$ruff_status"
+fi
+printf "%s\n" "Linting completed."
+
+## Testing
+printf "\n%s\n" "Executing tests..."
+start_tests=$(date +%s)
+coverage erase
+coverage run -m pytest --durations=0
+test_status=$?
+end_tests=$(date +%s)
+if [ "$test_status" -ne 0 ]; then
+    printf "%s\n" "❌ Tests failed — skipping coverage and type checks."
+    exit "$test_status"
+fi
+printf "\n%s\n\n\n" "Testing completed in $(($end_tests - $start_tests)) seconds."
+
+## Code coverage
+printf "%s\n" "Generating coverage report..."
+coverage_output=$(coverage report --show-missing --fail-under=100 2>&1)
+coverage_status=$?
+printf "%s\n" "$coverage_output"
+if [ "$coverage_status" -ne 0 ]; then
+    printf "%s\n" "❌ Coverage threshold not met."
+    exit "$coverage_status"
+fi
+printf "%s\n" "Code coverage successful."
+
+## Pyrefly
+printf "\n%s\n" "Running Pyrefly type checks..."
+pyrefly check
+pyrefly_status=$?
+
+if [ "$pyrefly_status" -ne 0 ]; then
+    printf "%s\n" "❌ Pyrefly found issues."
+    exit "$pyrefly_status"
+fi
+
+## Exiting
+printf "%s\n" "✅ All checks passed. Push allowed."
+exit 0
