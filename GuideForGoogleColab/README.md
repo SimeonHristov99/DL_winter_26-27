@@ -43,7 +43,7 @@ You should get the following opened as a seperate tab.
 Paste the following in the empty cell and press ***Cntr + Enter***:
 
 ```python
-print('Hello, Google Colab!')
+print("Hello, Google Colab!")
 ```
 
 You should get the following result:
