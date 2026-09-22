@@ -1,0 +1,36 @@
+{
+  "recommendations": [
+    // Spell-checks Markdown, comments, and code strings to catch typos in docs and source files.
+    "streetsidesoftware.code-spell-checker",
+
+    // Core Jupyter support for opening, editing, running, and debugging notebooks in VS Code.
+    "ms-toolsai.jupyter",
+
+    // Adds support for Jupyter cell tags, useful for notebook metadata and workflows like docs/slides/exporting.
+    "ms-toolsai.vscode-jupyter-cell-tags",
+
+    // Adds familiar Jupyter keyboard shortcuts inside VS Code notebooks.
+    "ms-toolsai.jupyter-keymap",
+
+    // Renders rich notebook outputs such as plots, images, SVG, HTML, and interactive visualizations.
+    "ms-toolsai.jupyter-renderers",
+
+    // Adds slideshow metadata support for presenting or exporting notebooks as slide decks.
+    "ms-toolsai.vscode-jupyter-slideshow",
+
+    // Improves Markdown authoring with shortcuts, table of contents, list editing, and formatting helpers.
+    "yzhang.markdown-all-in-one",
+
+    // Provides an enhanced Markdown preview with stronger rendering support for technical documentation.
+    "shd101wyy.markdown-preview-enhanced",
+
+    // Lints Markdown files to enforce consistent formatting and catch documentation style issues.
+    "davidanson.vscode-markdownlint",
+
+    // Provides static type checking for Python, helping catch type-related bugs before runtime.
+    "ms-pyright.pyright",
+
+    // Core Python support for VS Code, including environments, debugging, testing, and extension integration.
+    "ms-python.python"
+  ]
+}
