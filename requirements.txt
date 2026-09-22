@@ -1,0 +1,17 @@
+# Runtime
+numpy # array/tensor manipulation
+torch # the deep learning framework PyTorch
+torchvision # image transforms
+datasets # for using HuggingFace datasets
+transformers # for using HuggingFace models, tokenizers, model trainers etc
+torchmetrics # ready-to-use functions for calculating various classification and regression metrics
+faster-coco-eval # the fast COCO backend torchmetrics needs for mean average precision
+pillow # opening and converting images
+matplotlib # creating plots
+tqdm # progress bars for the training and evaluation loops
+
+# Development
+pyrefly # type checking
+ruff # code formatting and linting
+coverage # the amount of code executed by all tests
+pytest # framework for running tests
