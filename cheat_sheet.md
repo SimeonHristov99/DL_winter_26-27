@@ -10,6 +10,8 @@
     - [torch](#torch)
     - [unittest](#unittest)
     - [pytest](#pytest)
+  - [Week 04](#week-04)
+    - [graphviz](#graphviz)
 
 ## Week 01
 
@@ -864,4 +866,34 @@ class TestDivide(unittest.TestCase):
 
         # Then: validate the text of the error in some way
         self.assertEqual(exc.value, "Cannot divide by 0!")
+```
+
+## Week 04
+
+### graphviz
+
+> [!NOTE]
+> A third-party package; install it with `pip install graphviz` before importing.
+
+- [`graphviz.Digraph`](https://graphviz.readthedocs.io/en/stable/api.html#graphviz.Digraph) - Builds a directed graph; `node()` adds a node, `edge()` adds a directed edge, and `graph_attr={"rankdir": "LR"}` lays the graph out left-to-right.
+- [`Digraph.pipe`](https://graphviz.readthedocs.io/en/stable/api.html#graphviz.Digraph.pipe) - Renders the graph in memory and returns the raw bytes of the requested `format` (for example `"svg"`), without writing any intermediate file to disk.
+
+```python
+import graphviz
+
+dot = graphviz.Digraph(graph_attr={"rankdir": "LR"})
+dot.node(name="a", label="a", shape="record")
+dot.node(name="b", label="b", shape="record")
+dot.node(name="a+b", label="+")
+dot.edge("a", "a+b")
+dot.edge("b", "a+b")
+
+svg_bytes = dot.pipe(format="svg")
+print(type(svg_bytes).__name__)
+print(svg_bytes[:15])
+```
+
+```text
+bytes
+b'<?xml version="'
 ```

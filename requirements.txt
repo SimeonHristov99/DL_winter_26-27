@@ -9,6 +9,7 @@ faster-coco-eval # the fast COCO backend torchmetrics needs for mean average pre
 pillow # opening and converting images
 matplotlib # creating plots
 tqdm # progress bars for the training and evaluation loops
+graphviz # the library for drawing DAG (directed acyclic graphs)
 
 # Development
 pyrefly # type checking

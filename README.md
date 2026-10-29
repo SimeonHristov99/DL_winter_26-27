@@ -20,7 +20,7 @@
 1. :white_check_mark: 07.10, Wednesday, 7:15 pm, 326
 2. :white_check_mark: 14.10, Wednesday, 7:15 pm, 107
 3. :white_check_mark: 21.10, Wednesday, 7:15 pm, 107
-4. 28.10, Wednesday, 7:15 pm, 107
+4. :white_check_mark: 28.10, Wednesday, 7:15 pm, 107
 5. **30.10, Friday, 5:15 pm, 217**
 6. 04.11, Wednesday, 7:15 pm, 107
 7. 11.11, Wednesday, 7:15 pm, 107
@@ -50,7 +50,7 @@ Grading:
     - Behavior-driven development.
     - Presence of a model report file.
 - [ ] Midterm:
-  - Date: still TODO - possibly end of November - start of December.
+  - Date: one of these dates: 05.12, 06.12, 13.12.
   - Room: ???.
   - Time: ???, ~1 hour.
   - Content: theoretical questions and one-two tasks.

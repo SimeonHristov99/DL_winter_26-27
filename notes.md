@@ -59,6 +59,25 @@
       - [Task 12](#task-12-2)
       - [Task 13](#task-13-2)
       - [Task 14](#task-14-1)
+  - [Week 04 - Building an Automatic Differentiation Engine](#week-04---building-an-automatic-differentiation-engine)
+    - [Backpropagation](#backpropagation)
+    - [Building the `Value` class](#building-the-value-class)
+      - [Task 01](#task-01-3)
+      - [Task 02](#task-02-3)
+      - [Task 03](#task-03-3)
+      - [Task 04](#task-04-3)
+    - [Backpropagation by hand](#backpropagation-by-hand)
+      - [Task 05](#task-05-3)
+      - [Task 06](#task-06-3)
+      - [Task 07](#task-07-3)
+      - [Task 08](#task-08-3)
+      - [Task 09](#task-09-3)
+    - [Automatic differentiation](#automatic-differentiation)
+      - [Task 10](#task-10-3)
+      - [Task 11](#task-11-3)
+      - [Task 12](#task-12-3)
+      - [Task 13](#task-13-3)
+      - [Task 14](#task-14-2)
 
 ## Week 01 - Introduction to NumPy, Matplotlib and PyTorch
 
@@ -3612,8 +3631,8 @@ python run.py -w 3 -t 1
 
 ```text
 Dataset: [(0.0, 0.0), (1.0, 2.0), (2.0, 4.0), (3.0, 6.0)]
-initialize_weights(0, 100): 77.39560485559633
-initialize_weights(0, 10):  7.739560485559633
+initialize_weights(0, 100, 1): 77.39560485559633
+initialize_weights(0, 10, 1):  7.739560485559633
 ```
 
 <details>
@@ -3673,12 +3692,18 @@ $${\displaystyle L=\lim _{eps\to 0}{\frac {loss(w+eps)-loss(w)}{eps}}}$$
 
 **Description:**
 
-Create a script that builds a `6`-sample dataset and a seeded weight (`seed=42`, range `[0, 10)`), then computes the mean squared error between the model's predictions and the true values. The script then nudges the weight by `+0.002`, `+0.001`, `-0.001`, and `-0.002` in turn and prints the loss after each nudge, so we can see which direction actually helps.
+Define **`forward`** in `dl_lib.perceptron.functional`: applies the model to one input. Takes an input array and the weights, plus an optional bias (defaulting to `0.0`) and an optional activation (defaulting to `None`, meaning none is applied); returns the weighted sum of the input and the weights, plus the bias, with the activation applied if one was given.
+
+Create a script that builds a `6`-sample dataset and a seeded weight (`seed=42`, range `[0, 10)`), then uses `forward` to get the model's predictions and computes the mean squared error between them and the true values. The script then nudges the weight by `+0.002`, `+0.001`, `-0.001`, and `-0.002` in turn and prints the loss after each nudge, so we can see which direction actually helps.
 
 **Acceptance criteria:**
 
 - Calculations use `numpy` and `dl_lib.losses.functional.mse`.
 - The loss is printed before and after each of the four nudges.
+
+**Test cases:**
+
+See `tests/test_dl_lib/test_perceptron/test_functional.py`.
 
 **Example output:**
 
@@ -4006,6 +4031,10 @@ Define a `Perceptron` class in `dl_lib.perceptron.perceptron`: a single neuron w
 
 Also define **`train`** in `dl_lib.perceptron.training`: trains a `Perceptron`'s weights (and its bias, if it has one) with finite-difference gradient descent, reusing `numerical_gradient` and `gradient_descent_step`. Takes the model, a dataset of `(x, y)` pairs, a learning rate, a number of epochs, and how often to record progress; returns a list of `(epoch, loss)` pairs, one per recorded epoch plus the final one.
 
+`train` builds that loss by calling **`dataset_loss`** in `dl_lib.perceptron.functional`: takes the dataset, its targets, a `weights`/`bias`/`activation` combination, and the `loss` function to use (mean squared error by default); returns that loss evaluated over the whole dataset - the single scalar `numerical_gradient` perturbs against.
+
+Because `numerical_gradient` always perturbs an array while a `Perceptron`'s bias is a single float, `train` updates the bias through **`dataset_loss_given_bias`** instead: the same computation as `dataset_loss`, but with `bias` moved last and taken as a 1-element array, so it can be wrapped the same way as the weights.
+
 Also define **`and_dataset`** and **`or_dataset`** in `dl_lib.perceptron.datasets`.
 
 Finally, create a script that trains two `Perceptron` models - one on the `AND` dataset, one on `OR` without bias and an activation function and prints the loss every `10,000` epochs plus each model's final predictions on its own dataset.
@@ -4017,7 +4046,7 @@ Finally, create a script that trains two `Perceptron` models - one on the `AND` 
 
 **Test cases:**
 
-See `tests/test_dl_lib/test_perceptron/test_datasets.py`, `tests/test_dl_lib/test_perceptron/test_perceptron.py`, and `tests/test_dl_lib/test_perceptron/test_training.py`.
+See `tests/test_dl_lib/test_perceptron/test_datasets.py`, `tests/test_dl_lib/test_perceptron/test_functional.py`, `tests/test_dl_lib/test_perceptron/test_perceptron.py`, and `tests/test_dl_lib/test_perceptron/test_training.py`.
 
 **Example output:**
 
@@ -4126,7 +4155,7 @@ OR gate - predictions:
 
 **Description:**
 
-Retrain `AND` and `OR` this time with a bias and an activation function.
+Retrain `AND` this time with a bias and an activation function.
 
 To show a visual comparison train for `100,000` epochs with `learning_rate=0.1` - once with no activation and once with sigmoid - and plot both loss curves on one figure.
 
@@ -4546,3 +4575,662 @@ Watch [this YouTube video from the The Alan Turing Institute](https://www.youtub
 
 1. Answers are written in Bulgarian.
 2. Answers are written in the body of the email (not in a `.docx` or `.txt` file).
+
+## Week 04 - Building an Automatic Differentiation Engine
+
+Administrative: exam dates.
+
+### Backpropagation
+
+<details>
+
+<summary>How do we translate the expression "slope of a line"?</summary>
+
+Наклон на линия.
+
+</details>
+
+<details>
+
+<summary>How would you define the slope of a line?</summary>
+
+- slope (also gradient) = a number that describes the direction of the line on a plane.
+- often denoted by the letter $m$.
+
+![w04_slope.png](assets/w04_slope.png "w04_slope.png")
+
+- calculated as the ratio of the vertical change to the horizontal change ("rise over run") between two distinct points on the line:
+  - a 45° rising line has slope $m = 1$ (tan(45°) = 1)
+  - a 45° falling line has slope $m = -1$ (tan(-45°) = -1)
+
+</details>
+
+<details>
+
+<summary>What is the sign of the slope of an increasing line going up from left to right?</summary>
+
+Positive ($m > 0$).
+
+</details>
+
+<details>
+
+<summary>What is the sign of the slope of a decreasing line going down from left to right?</summary>
+
+Negative ($m < 0$).
+
+</details>
+
+<details>
+
+<summary>What is the slope of a horizontal line?</summary>
+
+$0$.
+
+</details>
+
+<details>
+
+<summary>What is the slope of a vertical line?</summary>
+
+A vertical line would lead to a $0$ in the denominator, so the slope can be regarder as `undefined` or `infinite`.
+
+</details>
+
+<details>
+
+<summary>What is the steepness of a line?</summary>
+
+- The absolute value of its slope:
+  - greater absolute value indicates a steeper line.
+
+</details>
+
+<details>
+
+<summary>Suppose a line runs through two points: P = (1, 2) and Q = (13, 8). What is its slope, direction and level of steepness?</summary>
+
+$dy = 8 - 2 = 6$
+$dx = 13 - 1 = 12$
+$m = \frac{dy}{dx} = \frac{6}{12} = \frac{1}{2} = 0.5$
+
+Direction: $0.5 > 0$ => up
+Steepness: $0 < 0.5 < 1$ => not very steep (less steep than a 45° rising line)
+
+</details>
+
+<details>
+
+<summary>Suppose a line runs through two points: P = (4, 15) and Q = (3, 21). What is its slope, direction and level of steepness?</summary>
+
+$dy = 21 - 15 = 6$
+$dx = 3 - 4 = -1$
+$m = \frac{dy}{dx} = \frac{6}{-1} = -6$
+
+Direction: $-6 < 0$ => down
+Steepness: $|-6| = 6 > 1$ => steep
+
+</details>
+
+<details>
+
+<summary>What is the link between "slope" and "derivative"?</summary>
+
+- For non-linear functions, the rate of change varies along the curve.
+- The derivative of the function at a point
+$=$ The slope of the line, tangent to the curve at the point
+$=$ The rate of change of the function at that point
+
+![w04_slop_der_connection.png](assets/w04_slop_der_connection.png "w04_slop_der_connection.png")
+
+Formula for slope:
+
+$m = \frac{dy}{dx}$
+
+Formula for derivative:
+
+${\displaystyle L=\lim _{eps\to 0}{\frac {f(x+eps)-f(x)}{eps}}}$
+
+it's the same formula as for the slope, only here the change in $x$ is infinitesimally small.
+
+For example, let $f$ be the squaring function: ${\displaystyle f(x)=x^{2}}$. Then the derivative is:
+
+$$\frac{f(x+eps) - f(x)}{eps} = \frac{(x+eps)^2 - x^2}{eps} = \frac{x^2 + 2xeps + eps^2 - x^2}{eps} = 2x + eps$$
+
+The division in the last step is valid as long as $eps \neq 0$. The closer $eps$ is to $0$, the closer this expression becomes to the value $2x$. The limit exists, and for every input $x$ the limit is $2x$. So, the derivative of the squaring function is the doubling function: ${\displaystyle f'(x)=2x}$.
+
+</details>
+
+<details>
+
+<summary>So, what added value does the derivative have?</summary>
+
+**It tells us how the value of the loss function changes when we *increase* (a part of) its input by a tiny amount.**
+
+Do we remember the below diagram?
+
+![w03_multiplier_loss_viz.png](assets/w03_multiplier_loss_viz.png "w03_multiplier_loss_viz.png")
+
+</details>
+
+<details>
+
+<summary>What is backpropagation then?</summary>
+
+Backpropagation is the iterative process of calculating derivatives of the loss function with respect to every `value` node leading up to it.
+
+Rules of thumb:
+
+```text
+Start from the final child (the last node in topological order).
++ => copy gradient to parents:
+    parent1.grad = current.grad
+    parent2.grad = current.grad
+* => multiply value of other parent with current gradient:
+    parent1.grad = parent2.value * current.grad
+    parent2.grad = parent1.value * current.grad
+```
+
+Let's say we have the following computational graph and we have to see how tiny changes in the weights and biases influence the value of `L`:
+
+![w04_03_result](assets/w04_03_result.svg?raw=true "w04_03_result.svg")
+
+<details>
+
+<summary>Reveal answer</summary>
+
+![w04_calculations](assets/w04_calculations.svg?raw=true "w04_calculations.svg")
+
+</details>
+
+</details>
+
+### Building the `Value` class
+
+#### Task 01
+
+**Description:**
+
+Define a class `Value` that wraps a single floating point number and provides:
+
+- construction: stores the float in a field `data`.
+- `__repr__`: prints itself as `Value(data=...)`.
+- `__add__`: adds two instances and returns a new instance holding the sum.
+- `__mul__`: multiplies two instances and returns a new instance holding the product.
+
+Create a script that constructs a few instances and prints the results of adding and multiplying them, including a small expression that chains both operators.
+
+**Acceptance criteria:**
+
+- Two instances of `Value` can be added.
+- Two instances of `Value` can be multiplied.
+
+**Test cases:** See `tests/test_dl_lib/test_engine/test_value.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 4 -t 1
+```
+
+```text
+a = Value(data=2.0)
+b = Value(data=-3.0)
+c = Value(data=10.0)
+a + b = Value(data=-1.0)
+a * b = Value(data=-6.0)
+a * b + c = Value(data=4.0)
+```
+
+#### Task 02
+
+**Description:**
+
+A single `Value` cannot answer the question "how was my number produced?". We need to record what it combined and how via two new fields:
+
+- `_prev`: the set of `Value`s that were combined to produce the current instance.
+- `_op`: the string name of the operation that produced the current instance.
+
+Create a script that builds a small two-operation expression and prints each intermediate `Value`'s `_op` and the `.data` of everything in its `_prev`. Because `_prev` is a `set` its iteration order is not meaningful. You could sorts by `.data` before printing to keep the output of the script reproducible.
+
+**Acceptance criteria:**
+
+- We can access the predecessor(s) of an instance.
+- We can see what operator the predecessor(s) used to produce an instance.
+
+**Test cases:** See `tests/test_dl_lib/test_engine/test_value.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 4 -t 2
+```
+
+```text
+d = Value(data=4.0)
+d._op = '+'
+d._prev = [10.0, -6.0]
+e = Value(data=-6.0)
+e._op = '*'
+e._prev = [2.0, -3.0]
+```
+
+#### Task 03
+
+**Description:**
+
+Define in `dl_lib.engine.graph`:
+
+- `trace`: walks the graph rooted at a `Value` and collects every node and every edge it can reach. Takes the root `Value`; returns a `(nodes, edges)` pair, where `nodes` is the set of every `Value` in the graph and `edges` is the set of `(child, parent)` pairs, meaning `child` is one of the operands that produced `parent`.
+- `draw_dot`: renders the graph rooted at a `Value` as a left-to-right Graphviz `Digraph`. Takes the root `Value`; returns the `Digraph`, with one record node per `Value` and one small node per operation, wired by `trace`'s edges.
+
+Create a script that traces a small expression, prints its node and edge counts, then displays it to the user.
+
+> [!NOTE]
+> Recall that you can check `cheat_sheet.md` for an introduction into the API of `graphviz`.
+
+**Acceptance criteria:**
+
+- We can create a graph of the predecessors of an instance.
+
+**Test cases:** See `tests/test_dl_lib/test_engine/test_graph.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 4 -t 3
+```
+
+```text
+Number of nodes: 5
+Number of edges: 4
+```
+
+![w04_graph.svg](assets/w04_graph.svg "w04_graph.svg")
+
+#### Task 04
+
+**Description:**
+
+Let's add names for the nodes and a field to store the gradient each node will eventually receive. Extend the class with:
+
+- `label`: a human-readable name, stored at construction and settable afterward, used for display.
+- `grad`: a `float` that defaults to `0.0`, holding the gradient that later tasks will fill in.
+
+Extend `draw_dot` so each record node renders as `{ label | data: value | grad: value }` with `data` and `grad` each formatted to four decimal places.
+
+Create a script that labels every node of a small expression and shows the labeled graph.
+
+**Acceptance criteria:**
+
+- `Value` accepts and stores an optional `label`.
+- `Value.grad` defaults to `0.0`.
+- `draw_dot`'s record nodes show `label`, `data`, and `grad`.
+- The script prints that `.grad` is still `0.0` before any backward pass.
+
+**Test cases:** See `tests/test_dl_lib/test_engine/test_value.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 4 -t 4
+```
+
+```text
+output = Value(data=20.0)
+output.grad = 0.0
+d.grad = 0.0
+```
+
+![w04_labeled_graph.svg](assets/w04_labeled_graph.svg "w04_labeled_graph.svg")
+
+### Backpropagation by hand
+
+#### Task 05
+
+**Description:**
+
+Let's compute a gradient by hand so that the chain rule is concrete rather than a formula we trust blindly.
+
+In `weeks/week4/task05.py` backpropagate the Task 04 graph by hand: starting from `output.grad = 1.0`, assign every other node's `grad` yourself using the local derivative of `+` and `*` at each step. Also define a function `manual_der`: a numerical-derivative checker, local to this script only, that estimates `d(output)/d(each argument)` with the central-difference formula, to sanity-check the hand-computed gradients.
+
+**Acceptance criteria:**
+
+- Every node's gradient is assigned by hand.
+- The script prints both the manual and the numerical gradients so they can be compared.
+
+**Example output:**
+
+```bash
+python run.py -w 4 -t 5
+```
+
+```text
+Manual gradients: a=-15.0, b=10.0, c=5.0, f=4.0
+Numerical gradients: a=-15.000000000497947, b=9.999999999976694, c=4.999999999810711, f=3.9999999998485687
+```
+
+#### Task 06
+
+**Description:**
+
+Reusing Task 05's hand-computed gradients, take one gradient-descent step: nudge every leaf, rebuild the expression from the updated leaves, and print the loss before and after the step.
+
+**Acceptance criteria:**
+
+- The loss decreases after one step.
+
+**Example output:**
+
+```bash
+python run.py -w 4 -t 6
+```
+
+```text
+L before step: 20.0
+L after step: 16.293599999999998
+```
+
+#### Task 07
+
+**Description:**
+
+Build a two-input perceptron's logit with every leaf labeled. Use `x1=2.0`, `x2=0.0`, `w1=-3.0`, `w2=1.0`, and `b=6.8813735870195432`. Print the logit and show the graph.
+
+> [!NOTE]
+> The bias `6.8813735870195432` is not arbitrary - it is chosen so that, once Task 08 squashes this logit through `tanh`, the result lands on a round number that makes the hand-derivative in Task 09 easy to check.
+
+**Acceptance criteria:**
+
+- The logit and graph are outputted.
+
+**Example output:**
+
+```bash
+python run.py -w 4 -t 7
+```
+
+```text
+logit = Value(data=0.8813735870195432)
+```
+
+![w04_perceptron_logit.svg](assets/w04_perceptron_logit.svg "w04_perceptron_logit.svg")
+
+#### Task 08
+
+**Description:**
+
+Add a `tanh` method to `Value`. Then, apply it on the previous task's perceptron and display the graph.
+
+**Acceptance criteria:**
+
+- `Value.tanh()` returns a new `Value` holding the hyperbolic tangent of a `Value`'s data.
+
+**Test cases:** See `tests/test_dl_lib/test_engine/test_value.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 4 -t 8
+```
+
+```text
+o = Value(data=0.7071067811865476)
+```
+
+![w04_perceptron_tanh.svg](assets/w04_perceptron_tanh.svg "w04_perceptron_tanh.svg")
+
+#### Task 09
+
+**Description:**
+
+Backpropagate the Task 08 perceptron graph by hand using the derivative of the `tanh` we showed in class. When done show the graph.
+
+**Acceptance criteria:**
+
+- Every node's `.grad` is assigned by hand including `tanh`.
+
+**Example output:**
+
+```bash
+python run.py -w 4 -t 9
+```
+
+```text
+x1.grad = -1.4999999999999996
+w1.grad = 0.9999999999999998
+x2.grad = 0.4999999999999999
+w2.grad = 0.0
+```
+
+![w04_perceptron_manual_backprop.svg](assets/w04_perceptron_manual_backprop.svg "w04_perceptron_manual_backprop.svg")
+
+### Automatic differentiation
+
+<details>
+
+<summary>What is topological ordering?</summary>
+
+Topological ordering of a directed graph is a linear ordering of its vertices such that for every directed edge $(u,v)$ from vertex $u$ to vertex $v$, $u$ comes before $v$ in the ordering.
+
+</details>
+
+<details>
+
+<summary>Can you give an example of a task that is solved using topological order?</summary>
+
+- The canonical application of topological sorting is in scheduling a sequence of jobs or tasks based on their dependencies.
+- Importing packages creates a DAG (direct acyclic graph).
+- Planning in software engineering often creates an implicit DAG: you cannot complete one task before another.
+
+</details>
+
+<details>
+
+<summary>Can there be multiple valid topological orderings?</summary>
+
+Absolutely:
+
+![w04_multi_top_sort.png](assets/w04_multi_top_sort.png "w04_multi_top_sort.png")
+
+For the above image both `4->5->3->1` and `5->4->3->1` are valid topological orders.
+
+</details>
+
+What is the topological order of the nodes in the following graph:
+
+![w04_top_sort_example.png](assets/w04_top_sort_example.png "w04_top_sort_example.png")
+
+<details>
+
+<summary>Reveal answer</summary>
+
+`0->3->1->4->2`
+
+- Since vertices `0` and `3` do not have any incoming edges from any other vertex, they appear first in the topological ordering;
+- Vertex `1` depends only on vertex `0`, so it comes after `0`;
+- Vertex `4` depends only on vertex `3`, placing it after `3`;
+- Finally, vertex `2` depends on both vertices `1` and `3`, so it appears after both of them in the ordering.
+
+</details>
+
+<details>
+
+<summary>How is topological order connected to backpropagation?</summary>
+
+We'd first have to sort the weights and biases topologically to do brackpropagation.
+
+</details>
+
+<details>
+
+<summary>What are the steps to implement this algorithm programmatically?</summary>
+
+The easiest way to do this is via depth-first search (DFS):
+
+The key idea of the DFS approach is to explore all dependent nodes of a vertex **before** the vertex itself is added to the ordering:
+
+1. Initialize an empty list `visited` list to track visited nodes and an empty list `stack` to store the result.
+2. Iterate through each vertex in the graph. If a vertex has not been visited, recursively call the (DFS) function on it.
+3. Inside the DFS function for a vertex $u$:
+   1. Mark $u$ as visited.
+   2. Recursively call the DFS function for all unvisited neighbors (adjacent vertices) of $u$.
+   3. **After** all neighbors and their descendants have been fully explored, push the current vertex $u$ onto the stack. This ensures a node is pushed only after all its dependencies are processed.
+4. After the DFS completes for all nodes, the stack will contain the vertices in **reverse** topological order. Pop the elements from the stack one by one (or reverse the list) to get the final topological ordering.
+
+We can also do this via breadth-first search (BFS) using the so-called `Kahn's Algorithm`. The two ways are explained in more detail in [Wikipedia](https://en.wikipedia.org/wiki/Topological_sorting).
+
+</details>
+
+#### Task 10
+
+**Description:**
+
+Extend `Value` and add `dl_lib.engine.graph`:
+
+- `top_sort` (in `dl_lib.engine.graph`): orders the graph rooted at a `Value` so every operand precedes the result it produced. Takes the root `Value`; returns the topologically sorted list.
+- `_backward`: every `Value` gets a `_backward` closure (a no-op by default) that, when called, pushes its own `.grad` into the `.grad` of the `Value`s that produced it.
+- `backward`: automates the hand process from Tasks 05 and 09. Takes no arguments; sets its own `.grad` to `1.0`, then calls every node's `_backward` in *reverse* topological order, so a node's gradient is fully accumulated from everything it feeds into before it propagates to its own operands.
+
+Create a script that adds two leaves, calls `.backward()` on the sum, and prints both leaves' gradients.
+
+**Acceptance criteria:**
+
+- `_backward` on an `__add__` result sends the output's gradient to both operands unchanged.
+- `top_sort` orders every operand before the result it produced.
+
+**Test cases:** See `tests/test_dl_lib/test_engine/test_value.py` and `tests/test_dl_lib/test_engine/test_graph.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 4 -t 10
+```
+
+```text
+c = Value(data=-1.0)
+a.grad = 1.0
+b.grad = 1.0
+```
+
+#### Task 11
+
+**Description:**
+
+`+` is wired; `*` and `tanh` are not yet. Both local derivatives are reusable, so they extend the library class.
+
+Wire `_backward` for `__mul__` and `tanh`.
+
+The demo for this task is a cautionary one, not a feature showcase: `weeks/week4/task11.py` reimplements just the `+`-`_backward` closure in a small standalone class, `_OverwritingValue`, that overwrites `.grad` instead of accumulating it, then runs it on `b = a + a` to see what goes wrong.
+
+**Acceptance criteria:**
+
+- We can backpropagate through multiplication.
+- We can backpropagate through a hyperbolic tangent.
+
+**Test cases:** See `test_when_called_on_product_of_distinct_values_then_each_operand_gets_the_others_data` and `test_when_called_on_tanh_then_operand_gets_the_local_tanh_derivative` in `tests/test_dl_lib/test_engine/test_value.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 4 -t 11
+```
+
+```text
+b.data = 6.0
+a.grad = 1.0
+```
+
+<details>
+<summary><code>b = a + a</code> should send <code>a</code> a gradient of <code>1.0</code> twice - so why does <code>a.grad</code> come out as <code>1.0</code> instead of <code>2.0</code>?</summary>
+
+Both "uses" of `a` in `b = a + a` are the *same* object, and `b`'s `_backward` closure calls `self.grad = out.grad` for the first operand and then `other.grad = out.grad` for the second - but `self` and `other` are both `a`. The second assignment does not add to the first; it overwrites it with the same value, `1.0`. The gradient contribution from the first use is silently lost.
+
+</details>
+
+#### Task 12
+
+**Description:**
+
+Fix the bug in Task 11.
+
+**Acceptance criteria:**
+
+- Every `_backward` closure accumulates into `.grad`.
+
+**Test cases:** See `test_when_value_is_reused_then_its_gradient_accumulates_across_every_use` in `tests/test_dl_lib/test_engine/test_value.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 4 -t 12
+```
+
+```text
+b = Value(data=6.0)
+a.grad = 2.0
+```
+
+#### Task 13
+
+**Description:**
+
+Every graph so far combines two `Value`s. Real expressions also mix a `Value` with a plain Python float (`x + 1`, `2 * w`) and need `/` and `exp`.
+
+Extend `dl_lib.engine.value.Value` with:
+
+- `__radd__` and `__rmul__`: let a `float` appear on the left of `+` or `*` with a `Value` on the right.
+- `__pow__`: raises a `Value` to a constant float power.
+- `__truediv__`: divides a `Value` by a `Value` or a `float`.
+- `exp`: returns a new `Value` holding `e ** self.data`.
+
+Create a script that shows the operators at work.
+
+**Acceptance criteria:**
+
+- The above functionality is implemented.
+
+**Test cases:** See `tests/test_dl_lib/test_engine/test_value.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 4 -t 13
+```
+
+```text
+a + 1.0 = Value(data=3.0)
+1.0 + a = Value(data=3.0)
+a * 2.0 = Value(data=4.0)
+2.0 * a = Value(data=4.0)
+a ** 2.0 = Value(data=4.0)
+a / 2.0 = Value(data=1.0)
+a.exp() = Value(data=7.38905609893065)
+```
+
+#### Task 14
+
+**Description:**
+
+`tanh` has been a single built-in method since Task 08 - a black box, even though we backpropagated through it by hand in Task 09. Now that `exp`, `/`, and float-interoperable `+`/`*` exist, we can write `tanh` out in terms of primitives the engine already knows how to differentiate, and check that backpropagating through the *decomposition* gives the same gradient as the built-in method. This is a one-off comparison, so it is demo-only.
+
+Build the same perceptron logit twice from identical inputs: once squashed with the built-in method `tanh`, and once with the formula for calculating `tanh` (using only `exp`, `*`, `+`, and `/`). Call `.backward()` on both and print each version's output and a couple of leaf gradients.
+
+**Acceptance criteria:**
+
+- Backpropagating through the decomposition produces the same leaf gradients as backpropagating through the built-in `tanh`.
+
+**Example output:**
+
+```bash
+python run.py -w 4 -t 14
+```
+
+```text
+o (decomposed) = Value(data=0.7071067811865477)
+x1.grad (decomposed) = -1.5
+w1.grad (decomposed) = 1.0
+o (built-in tanh) = Value(data=0.7071067811865476)
+x1.grad (built-in tanh) = -1.4999999999999996
+w1.grad (built-in tanh) = 0.9999999999999998
+```
