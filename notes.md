@@ -94,6 +94,21 @@
     - [Task 13](#task-13-4)
     - [Task 14](#task-14-3)
     - [Task 15](#task-15-1)
+  - [Week 06 - Optimizers](#week-06---optimizers)
+    - [Stochastic gradient descent (SGD)](#stochastic-gradient-descent-sgd)
+      - [Task 01](#task-01-5)
+      - [Task 02](#task-02-5)
+      - [Task 03](#task-03-5)
+      - [Task 04](#task-04-5)
+      - [Task 05](#task-05-5)
+    - [Adaptive gradients](#adaptive-gradients)
+      - [Task 06](#task-06-5)
+      - [Task 07](#task-07-5)
+      - [Task 08](#task-08-5)
+      - [Task 09](#task-09-5)
+    - [Comparing the five optimizers](#comparing-the-five-optimizers)
+      - [Task 10](#task-10-5)
+    - [Update rules](#update-rules)
 
 ## Week 01 - Introduction to NumPy, Matplotlib and PyTorch
 
@@ -5771,3 +5786,800 @@ params[1].shape = (4,)
 params[2].shape = (4, 2)
 params[3].shape = (2,)
 ```
+
+## Week 06 - Optimizers
+
+<details>
+
+<summary>What is an optimizer?</summary>
+
+The functionality that performs parameter updates.
+
+</details>
+
+<details>
+
+<summary>In which part of the model creation are optimizers used?</summary>
+
+They are used inside the training loop, all in the same manner:
+
+```python
+from torch import 
+
+optimizer = optim.SGD(model.parameters(), lr=0.001)
+
+<... start trainig loop ...>
+
+optimizer.zero_grad() # make the current gradients 0
+loss.backward()       # calculate the new gradients
+optimizer.step()      # update the parameters
+
+<... end trainig loop ...>
+```
+
+</details>
+
+Different optimizers have different logic for updating model parameters.
+
+<details>
+<summary>What optimizers have you heard of?</summary>
+
+Some built-in ones include:
+
+- [SGD](https://docs.pytorch.org/docs/stable/generated/torch.optim.SGD.html), optionally with momentum;
+- [AdaGrad](https://docs.pytorch.org/docs/stable/generated/torch.optim.Adagrad.html);
+- [RMSProp](https://docs.pytorch.org/docs/stable/generated/torch.optim.RMSprop.html);
+- [Adam](https://docs.pytorch.org/docs/stable/generated/torch.optim.Adam.html);
+- [AdamW](https://docs.pytorch.org/docs/stable/generated/torch.optim.AdamW.html) <- **most popular**;
+- [Muon](https://docs.pytorch.org/docs/2.15/generated/torch.optim.Muon.html) <- **gaining popularity**.
+
+</details>
+
+### Stochastic gradient descent (SGD)
+
+<details>
+
+<summary>What was the formula for the plain SGD we discussed last time?</summary>
+
+$$w_{i,t+1} = w_{i,t} - \lambda g_{i,t}$$
+
+</details>
+
+#### Task 01
+
+**Description:**
+
+Define an abstract base class `Optimizer` in `dl_lib.optim.optimizer`. Given a list of parameters and a learning rate, it:
+
+- stores the parameters and the learning rate on construction.
+- provides a method `zero_grad` that zeroes every parameter's gradient.
+- declares an abstract method `step`, left for every subclass to implement with its own update rule.
+
+Since this class is meant to be inherited and extended with update logic, we won't be using it in a script now.
+
+**Acceptance criteria:**
+
+- An ABC `Optimizer` is defined.
+
+**Test cases:** See `tests/test_dl_lib/test_optim/test_optimizer.py`.
+
+#### Task 02
+
+**Description:**
+
+Define a class `SGD` that extends `Optimizer`. Its step updates every parameter, in place, under `torch.no_grad()` so the update itself is not tracked for `autograd`.
+
+Create a script that constructs an `SGD` over one parameter. Manually set the gradient of that parameter, do one step, and print the parameter's value before and after the step.
+
+**Acceptance criteria:**
+
+- The SGD algorithm is implemented.
+
+**Test cases:** See `tests/test_dl_lib/test_optim/test_optimizers.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 6 -t 2
+```
+
+```text
+Before step: p = tensor([1., 2.])
+After step:  p = tensor([0.9900, 1.9800])
+```
+
+Ok - great! Let's see it in action.
+
+#### Task 03
+
+**Description:**
+
+Create a script that minimizes `f(x) = x**4 + x**3 - 5*x**2` starting from `x0 = 2.0` with plain SGD for a fixed number of steps at a fixed learning rate. It records every visited `x`, plots the curve with the trajectory overlaid as connected points, and prints the final `x` and `f(x)`.
+
+**Acceptance criteria:**
+
+- It is validated visually that plain SGD can get trapped in a local minimum and never reach the global minimum of a function.
+
+**Example output:**
+
+```bash
+python run.py -w 6 -t 3
+```
+
+```text
+Plain SGD final x: 1.2500, f(x) = -3.4180
+```
+
+![Plain SGD trajectory trapped in a local minimum](assets/w06_task03_sgd_local_minimum.png "Plain SGD trajectory trapped in a local minimum")
+
+<details>
+<summary>What does the chart show?</summary>
+
+SGD can get stuck:
+
+- oscillating across a narrow valley;
+- or stalling in a shallow dip where the gradient is small but not zero.
+
+</details>
+
+<details>
+<summary>How can we fix this?</summary>
+
+Momentum keeps a running "velocity" that accumulates gradients over time, the same way a rolling ball keeps some of its speed from the last step.
+
+A consistent downhill direction builds up speed, and a small shallow dip is not enough to stop a ball that already has momentum.
+
+$$v_{i,t} = \mu v_{i,t-1} + g_{i,t}$$
+
+$$w_{i,t+1} = w_{i,t} - \lambda v_{i,t}$$
+
+Here, $\mu$ is the momentum coefficient and $v$ is the momentum buffer.
+
+> [!NOTE]
+> Pytorch directly sets $v_{i,1}$ to $g_{i,1}$.
+>
+> With zero dampening (how much of the new gradient to *ignore*), this gives the same result as starting with $v_{i,0}=0$ and calculating $v_{i,1}$ using the formula from above (we'll do this in our implementation).
+
+</details>
+
+<details>
+<summary>How does Nesterov momentum work?</summary>
+
+First, we update the momentum buffer as shown above.
+
+To do the update, we use the current gradient plus a momentum-scaled copy of the updated buffer:
+
+$$w_{i,t+1} = w_{i,t} - \lambda \left(g_{i,t} + \mu v_{i,t}\right)$$
+
+</details>
+
+#### Task 04
+
+**Description:**
+
+Extend `SGD` with a parameter for momentum, defaulting to `0.0`.
+
+- On construction, it initializes a list `velocities` of zero tensors, one tensor per parameter and in the same order as `params`.
+- With momentum, `step` keeps using that list: each call first updates the velocity, then adds that velocity to the parameter.
+
+Apply SGD with momentum in Task 03 and see if you can beat plain SGD.
+
+Then, runs SGD it on a function shaped like a steep, narrow ravine (`f(x, y) = 10 * x**2 + 0.1 * y**2`), where the gradient is far larger in one direction than the other at every point. It records the trajectory and plots it over the function's contours, together with the final position.
+
+> [!NOTE]
+> Feel free to refer to `cheat_sheet.md` for guidance on how to create the contour plot!
+
+**Acceptance criteria:**
+
+- The class `SGD` supports momentum in a backward compatible manner.
+
+**Test cases:** See `tests/test_dl_lib/test_optim/test_optimizers.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 6 -t 4
+```
+
+```text
+Plain SGD final x: 1.2500, f(x) = -3.4180
+Momentum SGD final x: -1.9995, f(x) = -12.0000
+Momentum SGD on ravine final: x=-0.0747, y=-0.0566
+```
+
+![SGD trajectory with and without momentum](assets/w06_task04_momentum_trajectory.png "SGD trajectory with and without momentum")
+
+![SGD with momentum zig-zagging in a steep, narrow ravine](assets/w06_task04_momentum_ravine.png "SGD with momentum zig-zagging in a steep, narrow ravine")
+
+<details>
+<summary>What does this graph show?</summary>
+
+The ravine's gradient is much larger across its width than along its length. Momentum builds up speed in that steep direction too, so it keeps overshooting from one wall to the other instead of moving steadily toward the minimum along the shallow direction.
+
+</details>
+
+<details>
+<summary>How do we call the learning rate and momentum in the context of SGD?</summary>
+
+Hyperparameters.
+
+</details>
+
+<details>
+<summary>How can we define these types of parameters?</summary>
+
+Training is the process of finding the optimal values of a neural network's parameters.
+
+Hyperparameters, thus, are (all of) the parameters of this training process. *They are meta-parameters from the point of view of the neural network.*
+
+</details>
+
+<details>
+<summary>How do we call the process of finding the optimal hyperparameters?</summary>
+
+Hyperparameter tuning!
+
+</details>
+
+#### Task 05
+
+**Description:**
+
+Create a script that samples several `(lr, momentum)` pairs from seeded uniform ranges, runs SGD on the same function from Task 04 for a fixed number of steps for each pair, and prints one row per sampled configuration (learning rate, momentum, final `x`, final `f(x)`) followed by the single best configuration.
+
+**Acceptance criteria:**
+
+- Hyperparameter tuning is performed.
+
+**Example output:**
+
+```bash
+python run.py -w 6 -t 5
+```
+
+```text
+      lr   momentum    final x       f(x)
+  0.0480     0.9194    -2.0007   -12.0000
+  0.0075     0.0823     1.2500    -3.4180
+  0.0426     0.7139    -2.0000   -12.0000
+  0.0351     0.2989     1.2500    -3.4180
+  0.0323     0.5886     1.2500    -3.4180
+  0.0312     0.1536     1.2500    -3.4180
+  0.0244     0.3817     1.2500    -3.4180
+  0.0375     0.9650    -1.9199   -11.9201
+Best config: lr=0.0426, momentum=0.7139 -> x=-2.0000, f(x)=-12.0000
+```
+
+<details>
+<summary>What does the table show?</summary>
+
+- Most low-momentum configurations never escape the shallow dip at `x = 1.25`.
+- Only the pairs with enough momentum (roughly `momentum > 0.7`) carry the point over the hump and into the deeper minimum. This is why usually momentum is usually set to be at least `0.9`. See the example here: <https://docs.pytorch.org/docs/2.15/generated/torch.optim.SGD.html>.
+
+</details>
+
+### Adaptive gradients
+
+<details>
+<summary>What are the limitations of SGD (with and without momentum)?</summary>
+
+The learning rate is fixed across every parameter - what if some parameters need bigger steps than others?
+
+- A parameter whose gradient is consistently small moves slowly under a shared learning rate.
+- A parameter whose gradient is consistently large can overshoot at that same rate.
+
+</details>
+
+<details>
+<summary>How can we fix this?</summary>
+
+Let's give each parameter its own learning rate.
+
+We'll scaled it down by how large that parameter's gradients have been so far.
+
+</details>
+
+<details>
+<summary>What is the exact AdaGrad update?</summary>
+
+$$v_{i,t} = v_{i,t-1} + g_{i,t}^2$$
+
+$$w_{i,t+1} = w_{i,t} - \lambda\frac{g_{i,t}}{\sqrt{v_{i,t}}+\epsilon}$$
+
+starting from $v_{i,0} = 0$.
+
+</details>
+
+#### Task 06
+
+**Description:**
+
+Define a class `AdaGrad` extending `Optimizer`.
+
+- Constructed with an `eps` for numerical stability (default `1e-10`), it initializes a list of zero tensors - `accumulators`, one per parameter and in the same order as `params`.
+- Its `step` per parameter:
+  - adds the squared gradient to that parameter's entry in `accumulators`.
+  - updates the parameter so parameters with a larger accumulated gradient history take smaller steps.
+
+Create a script that runs SGD with momentum and AdaGrad from the same starting point on the ravine function.
+
+It then runs AdaGrad twice on a separate, one-parameter function: `f(x) = 0.5 * x**2`, both starting from the same point, except that one run receives a single much larger gradient on the very first step. It records both trajectories and plots them together, along with each run's final value.
+
+**Acceptance criteria:**
+
+- The `AdaGrad` algorithm is implemented.
+
+**Test cases:** See `tests/test_dl_lib/test_optim/test_optimizers.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 6 -t 6
+```
+
+```text
+SGD (momentum) final: x=-0.0747, y=-0.0566
+AdaGrad final:        x=0.0000, y=0.0000
+AdaGrad (no spike) final x: 0.0275
+AdaGrad (early spike) final x: 3.3492
+```
+
+![AdaGrad vs. SGD with momentum on an elongated ravine](assets/w06_task06_adagrad_ravine.png "AdaGrad vs. SGD with momentum on an elongated ravine")
+
+![AdaGrad stalls after one unusually large early gradient](assets/w06_task06_adagrad_spike.png "AdaGrad stalls after one unusually large early gradient")
+
+<details>
+<summary>What do these graphs show?</summary>
+
+In the ravine, SGD with momentum keeps overshooting across the steep direction while barely moving along the shallow one. AdaGrad shrinks its steps in the steep direction and keeps them larger in the shallow one, so it heads straight for the minimum instead.
+
+In the spike plot, both runs face identical gradients after step 1. The run that saw one oversized gradient early on never catches up: that single step inflated its accumulator forever, so its learning rate stays small for the rest of training.
+
+</details>
+
+<details>
+<summary>What is the limitation of AdaGrad?</summary>
+
+AdaGrad's accumulator only ever grows, so after enough steps it becomes so large that the effective learning rate collapses to almost zero.
+
+</details>
+
+<details>
+<summary>What does this mean for training?</summary>
+
+It effectively stops.
+
+</details>
+
+<details>
+<summary>How can we fix it?</summary>
+
+We can replace the raw running sum with an exponential moving average.
+
+In this way the old gradient history fades out instead of piling up forever, keeping the effective learning rate from vanishing.
+
+The algorithm that does this is called `RMSprop`:
+
+$$v_{i,t} = \rho v_{i,t-1} + (1-\rho) g_{i,t}^2$$
+
+$$w_{i,t+1} = w_{i,t} - \lambda\frac{g_{i,t}}{\sqrt{v_{i,t}}+\epsilon}$$
+
+where $\rho$ is the decay rate (called `alpha` in the code), starting from $v_{i,0} = 0$.
+
+</details>
+
+#### Task 07
+
+**Description:**
+
+Define a class `RMSprop` that is constructed with a decay rate `alpha` (default `0.99`) and an `eps` for numerical stability (default `1e-8`).
+
+It too initializes a list of zero tensors - `accumulators`, one per parameter and in the same order as `params`.
+
+Its step, per parameter:
+
+- updates that parameter's entry in `accumulators` as an exponential moving average.
+- updates the parameter with the same rule `AdaGrad` uses.
+
+Create a script that runs `AdaGrad` and `RMSprop` on the same one-parameter function.
+
+It then runs `RMSprop` twice more on that same function from the same starting point, once with the exact gradient at every step and once with a fixed amount of random noise added to the gradient at every step.
+
+**Acceptance criteria:**
+
+- The `RMSprop` algorithm is implemented.
+
+**Test cases:** See `tests/test_dl_lib/test_optim/test_optimizers.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 6 -t 7
+```
+
+```text
+AdaGrad (early spike) final x: 3.3492
+RMSprop (early spike) final x: 0.0000
+RMSprop (clean gradient) final x: 0.0000
+RMSprop (noisy gradient) final x: 0.2565
+```
+
+![RMSprop recovers from an early gradient spike where AdaGrad stalls](assets/w06_task07_rmsprop_spike_recovery.png "RMSprop recovers from an early gradient spike where AdaGrad stalls")
+
+<details>
+<summary>What does this graph show?</summary>
+
+Both runs see the same oversized gradient on step 1. `AdaGrad`'s accumulator keeps that spike forever, so its effective learning rate stays tiny for the rest of training. `RMSprop`'s exponential moving average discounts that same spike more and more with every later step, so it recovers and reaches the minimum almost immediately.
+
+</details>
+
+![RMSprop jitters around the minimum under noisy gradients](assets/w06_task07_rmsprop_noise_jitter.png "RMSprop jitters around the minimum under noisy gradients")
+
+<details>
+<summary>What does this graph show?</summary>
+
+RMSprop only rescales how large a step is; it has **no memory of which direction previous steps moved** in, so it cannot average away noise in the gradient's direction the way momentum does.
+
+</details>
+
+<details>
+<summary>How can we fix it?</summary>
+
+`SGD` with momentum smooths the update direction; `RMSprop` adapts the learning rate per parameter. `Adam` combines both ideas into a single update rule, with a correction for the fact that both running averages start at zero and are biased low early in training.
+
+$$\tilde g_{i,t} = g_{i,t} + \gamma w_{i,t} \quad \text{(when weight decay } \gamma \text{ is set)}$$
+
+$$m_{i,t} = \beta_1 m_{i,t-1} + (1-\beta_1) \tilde g_{i,t}$$
+
+$$v_{i,t} = \beta_2 v_{i,t-1} + (1-\beta_2) \tilde g_{i,t}^2$$
+
+$$\widehat{m}_{i,t} = \frac{m_{i,t}}{1-\beta_1^t}, \qquad \widehat{v}_{i,t} = \frac{v_{i,t}}{1-\beta_2^t}$$
+
+$$w_{i,t+1} = w_{i,t} - \lambda\frac{\widehat{m}_{i,t}}{\sqrt{\widehat{v}_{i,t}}+\epsilon}$$
+
+starting from $m_{i,0} = 0$ and $v_{i,0} = 0$.
+
+</details>
+
+You can notice that there is a correction done on the values of $m$ and $v$. This is known as Adam's **bias correction** for the initial steps of the optimizer.
+
+Suppose the first gradient is \(g_1=2\), with Adam's usual \(\beta_1=0.9\) and \(\beta_2=0.999\). Since both running averages start at zero:
+
+\[
+m_1=0.9(0)+0.1(2)=0.2
+\]
+\[
+v_1=0.999(0)+0.001(2^2)=0.004
+\]
+
+Those averages are much smaller than the gradient and its square because they’ve only had one step to build up. Bias correction gives:
+
+\[
+\hat m_1=\frac{0.2}{1-0.9}=2,
+\qquad
+\hat v_1=\frac{0.004}{1-0.999}=4
+\]
+
+So for learning rate \(\lambda\), Adam’s first update is approximately
+
+\[
+-\lambda\frac{\hat m_1}{\sqrt{\hat v_1}}
+=-\lambda\frac{2}{2}
+=-\lambda.
+\]
+
+The correction adjusts the averages for the fact that they started at zero.
+
+#### Task 08
+
+**Description:**
+
+Define a class `Adam` that is constructed with:
+
+- `beta1` (default `0.9`);
+- `beta2` (default `0.999`);
+- `eps` (default `1e-8`);
+- an optional `weight_decay` (default `0.0`).
+
+It initializes a first-moment list `m` and a second-moment list `v`, both zero tensors per parameter and in the same order as `params`, and a shared step counter `t` starting at `0`.
+
+Its `step`, per parameter:
+
+- folds `weight_decay * p` into the gradient first, when `weight_decay` is set (the L2-style approach);
+- updates `m` and `v`;
+- bias-corrects both with `t` across all parameters;
+- updates the parameter.
+
+Create a script that runs `RMSprop` and `Adam` on the same one-parameter function from the same starting point, with a fixed amount of random noise added to the gradient at every step. It records both trajectories and plots them together, along with each run's final value.
+
+It then constructs two `Adam` optimizers with the same `weight_decay`, one whose second-moment estimate already holds a large value and one whose second-moment estimate already holds a small value, simulating two parameters with very different histories of gradient magnitude. It runs each for the same number of steps with no other gradient signal. It records both trajectories and plots them together, along with each run's final value.
+
+**Acceptance criteria:**
+
+- The `Adam` algorithm is implemented.
+- It is validated visually that Adam's momentum smooths out noisy gradients that make RMSprop jitter.
+- It is validated visually that Adam decays two parameters with the same `weight_decay` at different rates when their gradient histories differ.
+
+**Test cases:** See `tests/test_dl_lib/test_optim/test_optimizers.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 6 -t 8
+```
+
+```text
+RMSprop (noisy gradient) final x: 0.2565
+Adam (noisy gradient) final x: 0.0095
+Adam (large gradient history) final p: 0.9743
+Adam (small gradient history) final p: 0.8763
+```
+
+![Adam's momentum smooths out noisy gradients where RMSprop jitters](assets/w06_task08_adam_noise_smoothing.png "Adam's momentum smooths out noisy gradients where RMSprop jitters")
+
+<details>
+<summary>What does this graph show?</summary>
+
+Both runs see the exact same noisy gradients at every step. RMSprop's rescaled step still follows each step's noisy direction, so it jitters once it nears the minimum. Adam's first-moment estimate averages that same noisy direction across recent steps, so its path stays smooth all the way down.
+
+</details>
+
+![Adam decays two parameters with the same weight_decay at different rates](assets/w06_task08_adam_uneven_decay.png "Adam decays two parameters with the same weight_decay at different rates")
+
+<details>
+<summary>What does this graph show?</summary>
+
+Both parameters start at the same value, see no gradient other than the weight decay term, and share the same `weight_decay`. Adam folds `weight_decay * p` into the gradient before dividing by `sqrt(v_hat)`, so the parameter whose second moment is already large gets divided down more and decays more slowly, while the one with a small second moment decays faster - the same nominal decay rate produces two different outcomes.
+
+</details>
+
+<details>
+<summary>What is the limitation of Adam?</summary>
+
+Adam's `weight_decay` is added directly into the gradient before the moment estimates are computed, so it gets divided by `sqrt(v_hat)` along with the rest of the gradient - a parameter with large gradients gets *less* decay than one with small gradients, which is an accident of the adaptive learning rate, not an intentional design choice.
+
+</details>
+
+<details>
+<summary>How can we fix it?</summary>
+
+Apply weight decay as a separate term after the adaptive update instead, so every parameter decays by the same proportion regardless of its gradient history.
+
+This is the one change that makes AdamW the more common default for training large models today.
+
+</details>
+
+<details>
+<summary>What is the exact AdamW update?</summary>
+
+$$m_{i,t} = \beta_1 m_{i,t-1} + (1-\beta_1) g_{i,t}$$
+
+$$v_{i,t} = \beta_2 v_{i,t-1} + (1-\beta_2) g_{i,t}^2$$
+
+$$\widehat{m}_{i,t} = \frac{m_{i,t}}{1-\beta_1^t}, \qquad \widehat{v}_{i,t} = \frac{v_{i,t}}{1-\beta_2^t}$$
+
+$$w_{i,t+1} = (1-\lambda\gamma) w_{i,t} - \lambda\frac{\widehat{m}_{i,t}}{\sqrt{\widehat{v}_{i,t}}+\epsilon}$$
+
+where $g_{i,t}$ excludes the weight-decay term, and $\gamma \ge 0$ is the weight-decay coefficient (called `weight_decay` in the code), starting from $m_{i,0} = 0$ and $v_{i,0} = 0$.
+
+</details>
+
+#### Task 09
+
+**Description:**
+
+Define a class `AdamW` extending `Adam`.
+
+It overrides `step` to use the exact same moment updates and bias correction as `Adam`, but computes them from the raw gradient only (never adding `weight_decay * p` into it), and after the adaptive update applies the parameter update as a separate term when `weight_decay` is set.
+
+Create a script that constructs two `AdamW` optimizers with the same `weight_decay`, one whose second-moment estimate already holds a large value and one whose second-moment estimate already holds a small value, simulating two parameters with very different histories of gradient magnitude. It runs each for the same number of steps with no other gradient signal. It records both trajectories and plots them together, along with each run's final value.
+
+**Acceptance criteria:**
+
+- The `AdamW` algorithm is implemented.
+- It is validated visually that AdamW decays both parameters by the same proportion regardless of their gradient history, where Adam decayed them at different rates.
+
+**Test cases:** See `tests/test_dl_lib/test_optim/test_optimizers.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 6 -t 9
+```
+
+```text
+AdamW (large gradient history) final p: 0.8605
+AdamW (small gradient history) final p: 0.8605
+```
+
+![AdamW decays both parameters by the same proportion](assets/w06_task09_adamw_even_decay.png "AdamW decays both parameters by the same proportion")
+
+<details>
+<summary>What does this graph show?</summary>
+
+Both parameters start at the same value and share the same `weight_decay`, but now AdamW applies that decay as a separate term after the adaptive update, instead of folding it into the gradient. It no longer gets divided by `sqrt(v_hat)`, so the two parameters, despite their very different second-moment histories, shrink by the exact same proportion at every step - the two curves sit on top of each other.
+
+</details>
+
+### Comparing the five optimizers
+
+Every optimizer this week has been exercised on a toy tensor in isolation. This task puts all five to work on the same real-looking problem, a small linear regression, and reports which one actually gets there fastest.
+
+#### Task 10
+
+**Description:**
+
+Create a script that:
+
+- builds a synthetic linear dataset (`y = 2.5x - 1.0` plus Gaussian noise, seeded for reproducibility) using `torch.linspace` for `x`.
+- trains bias, starting from zero, a single weight with each of `SGD`, `AdaGrad`, `RMSprop`, `Adam`, and `AdamW` for the same fixed number of epochs, each with a learning rate tuned on this problem (`Adam` and `AdamW` additionally use a small `weight_decay` so the two are visibly different).
+- prints a model report: a baseline row holding the mean predictor's mean-squared-error loss, followed by one row per optimizer in the order they were tried, each showing its final loss and the signed percent change versus the baseline, and a comment.
+- names the single best-performing optimizer explicitly at the bottom of the report.
+
+**Acceptance criteria:**
+
+- Optimizers are compared on a regression task.
+
+**Example output:**
+
+```bash
+python run.py -w 6 -t 10
+```
+
+```text
+optimizer    final loss    vs baseline  comment
+baseline       18.76643 +         0.0%  mean predictor, ignores x
+SGD             0.97043 -        94.8%  plain gradient descent, no momentum
+AdaGrad         0.24180 -        98.7%  per-parameter learning rate, needs a bigger lr here
+RMSprop         0.23746 -        98.7%  decayed accumulator, fastest to converge here
+Adam            3.76134 -        80.0%  L2-style decay folded into the gradient
+AdamW           4.42134 -        76.4%  decoupled decay, differs from Adam above
+Best optimizer: RMSprop (final loss = 0.23746)
+```
+
+> [!WARNING]
+> There is no single/direct answer to the question *Which is the best optimizer?*! As you can see different tasks may be solved with different optimizers.
+>
+> Always do experiments and use their outcomes to gain experience on what would work in a similar context.
+
+### Update rules
+
+**SGD**
+
+$$
+\boxed{
+w_{i,t+1} = w_{i,t} - \lambda g_{i,t}
+}
+$$
+
+**SGD with momentum**
+
+$$
+\boxed{
+v_{i,t} = \mu v_{i,t-1} + g_{i,t}
+}
+$$
+
+$$
+\boxed{
+w_{i,t+1} = w_{i,t} - \lambda v_{i,t}
+}
+$$
+
+starting from $v_{i,0} = 0$.
+
+**SGD with Nesterov momentum**
+
+$$
+\boxed{
+w_{i,t+1} = w_{i,t} - \lambda \left(g_{i,t} + \mu v_{i,t}\right)
+}
+$$
+
+with $v_{i,t}$ updated the same way as in SGD with momentum above.
+
+**AdaGrad**
+
+$$
+\boxed{
+v_{i,t} = v_{i,t-1} + g_{i,t}^2
+}
+$$
+
+$$
+\boxed{
+w_{i,t+1} = w_{i,t} - \lambda\frac{g_{i,t}}{\sqrt{v_{i,t}}+\epsilon}
+}
+$$
+
+starting from $v_{i,0} = 0$.
+
+**RMSprop**
+
+$$
+\boxed{
+v_{i,t} = \rho v_{i,t-1} + (1-\rho) g_{i,t}^2
+}
+$$
+
+$$
+\boxed{
+w_{i,t+1} = w_{i,t} - \lambda\frac{g_{i,t}}{\sqrt{v_{i,t}}+\epsilon}
+}
+$$
+
+where $\rho$ is the decay rate (called `alpha` in the code), starting from $v_{i,0} = 0$.
+
+**Adam**
+
+$$
+\boxed{
+\tilde g_{i,t} = g_{i,t} + \gamma w_{i,t} \quad \text{(when weight decay } \gamma \text{ is set)}
+}
+$$
+
+$$
+\boxed{
+m_{i,t} = \beta_1 m_{i,t-1} + (1-\beta_1) \tilde g_{i,t}
+}
+$$
+
+$$
+\boxed{
+v_{i,t} = \beta_2 v_{i,t-1} + (1-\beta_2) \tilde g_{i,t}^2
+}
+$$
+
+$$
+\boxed{
+\widehat{m}_{i,t} = \frac{m_{i,t}}{1-\beta_1^t}
+}
+$$
+
+$$
+\boxed{
+\widehat{v}_{i,t} = \frac{v_{i,t}}{1-\beta_2^t}
+}
+$$
+
+$$
+\boxed{
+w_{i,t+1} = w_{i,t} - \lambda\frac{\widehat{m}_{i,t}}{\sqrt{\widehat{v}_{i,t}}+\epsilon}
+}
+$$
+
+starting from $m_{i,0} = 0$ and $v_{i,0} = 0$.
+
+**AdamW**
+
+$$
+\boxed{
+m_{i,t} = \beta_1 m_{i,t-1} + (1-\beta_1) g_{i,t}
+}
+$$
+
+$$
+\boxed{
+v_{i,t} = \beta_2 v_{i,t-1} + (1-\beta_2) g_{i,t}^2
+}
+$$
+
+$$
+\boxed{
+\widehat{m}_{i,t} = \frac{m_{i,t}}{1-\beta_1^t}
+}
+$$
+
+$$
+\boxed{
+\widehat{v}_{i,t} = \frac{v_{i,t}}{1-\beta_2^t}
+}
+$$
+
+$$
+\boxed{
+w_{i,t+1} = (1-\lambda\gamma) w_{i,t} - \lambda\frac{\widehat{m}_{i,t}}{\sqrt{\widehat{v}_{i,t}}+\epsilon}
+}
+$$
+
+where $g_{i,t}$ excludes the weight-decay term, and $\gamma \ge 0$ is the weight-decay coefficient (called `weight_decay` in the code), starting from $m_{i,0} = 0$ and $v_{i,0} = 0$.

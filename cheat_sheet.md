@@ -12,6 +12,9 @@
     - [pytest](#pytest)
   - [Week 04](#week-04)
     - [graphviz](#graphviz)
+  - [Week 06](#week-06)
+    - [torch](#torch-1)
+    - [matplotlib](#matplotlib-1)
 
 ## Week 01
 
@@ -897,3 +900,73 @@ print(svg_bytes[:15])
 bytes
 b'<?xml version="'
 ```
+
+## Week 06
+
+### torch
+
+- [`torch.linspace`](https://pytorch.org/docs/stable/generated/torch.linspace.html#torch.linspace) - Returns a 1-D tensor of evenly spaced values between the given start and end, inclusive, with the given number of steps.
+
+```python
+import torch
+
+print(torch.linspace(-1.0, 1.0, 5))
+```
+
+```text
+tensor([-1.0000, -0.5000,  0.0000,  0.5000,  1.0000])
+```
+
+- [`torch.meshgrid`](https://pytorch.org/docs/stable/generated/torch.meshgrid.html#torch.meshgrid) - Builds coordinate grids from 1-D coordinate tensors, returning one tensor per input broadcast to the full grid shape; `indexing='xy'` matches the Cartesian (x horizontal, y vertical) convention.
+
+```python
+import torch
+
+grid_x, grid_y = torch.meshgrid(
+    torch.tensor([0.0, 1.0, 2.0]), torch.tensor([10.0, 20.0]), indexing="xy"
+)
+print(grid_x)
+print(grid_y)
+```
+
+```text
+tensor([[0., 1., 2.],
+        [0., 1., 2.]])
+tensor([[10., 10., 10.],
+        [20., 20., 20.]])
+```
+
+### matplotlib
+
+- [`matplotlib.axes.Axes.contour`](https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.contour.html#matplotlib.axes.Axes.contour) - Draws contour lines of a 2-D scalar field over a coordinate grid, connecting points of equal value; closer-spaced lines mark a steeper gradient.
+
+A contour plot needs a value $z = f(x, y)$ at every point of a 2-D grid, then draws lines connecting points of equal $z$.
+
+To create one we'll use the following procedure:
+
+1. Build the grid of $(x, y)$ coordinates with [`torch.meshgrid`](https://docs.pytorch.org/docs/stable/generated/torch.meshgrid.html), passing the two axes' coordinate ranges (e.g. from `torch.linspace`) and `indexing="xy"` so the first returned tensor varies along columns (x) and the second along rows (y), matching how `contour` expects them.
+2. Evaluate the function on the whole grid at once (it is just tensor arithmetic, e.g. `10 * grid_x**2 + 0.1 * grid_y**2`) to get `grid_z`.
+3. Call [`ax.contour(grid_x, grid_y, grid_z, levels=..., cmap=...)`](https://matplotlib.org/stable/api/_as_gen/matplotlib.axes.Axes.contour.html) to draw the lines; `levels` controls how many lines (more levels = finer detail), and `cmap` colors them (e.g. `"Greys"` for a neutral background that does not compete with the trajectory plotted on top).
+4. Overlay the optimizer's recorded trajectory as a normal `ax.plot(...)` call on the same axes.
+
+Closer-spaced lines mark a steeper gradient - this is exactly why the ravine's contours in Task 04 look like a narrow stack of vertical bands: the function is far steeper across x than along y.
+
+```python
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import torch
+
+grid_x, grid_y = torch.meshgrid(
+    torch.linspace(-4.5, 4.5, 200), torch.linspace(-4.5, 4.5, 200), indexing="xy"
+)
+grid_z = 10 * grid_x**2 + 0.1 * grid_y**2
+
+figure, axis = plt.subplots()
+axis.plot([0, 1], [0, 1])
+axis.contour(grid_x, grid_y, grid_z, levels=30, cmap="Greys")
+```
+
+Without: ![before](assets/w06_cheatsheet_contour_before.png)
+With:    ![after](assets/w06_cheatsheet_contour_after.png)
