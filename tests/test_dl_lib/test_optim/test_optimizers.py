@@ -71,8 +71,8 @@
 #         lr = 0.1
 #         momentum = 0.9
 #         sgd = SGD([p], lr=lr, momentum=momentum)
-#         expected_velocity_after_first_step = torch.tensor([-0.01, -0.02])
-#         expected_velocity_after_second_step = torch.tensor([-0.019, -0.038])
+#         expected_velocity_after_first_step = torch.tensor([0.1, 0.2])
+#         expected_velocity_after_second_step = torch.tensor([0.19, 0.38])
 
 #         # Act
 #         p.grad = torch.tensor([0.1, 0.2])
