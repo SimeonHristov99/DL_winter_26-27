@@ -109,6 +109,16 @@
     - [Comparing the five optimizers](#comparing-the-five-optimizers)
       - [Task 10](#task-10-5)
     - [Update rules](#update-rules)
+  - [Week 07 - Regularization and Normalization](#week-07---regularization-and-normalization)
+    - [Task 01](#task-01-6)
+    - [Task 02](#task-02-6)
+    - [Task 03](#task-03-6)
+    - [Task 04](#task-04-6)
+    - [Task 05](#task-05-6)
+    - [Task 06](#task-06-6)
+    - [Task 07](#task-07-6)
+    - [Task 08](#task-08-6)
+    - [Task 09](#task-09-6)
 
 ## Week 01 - Introduction to NumPy, Matplotlib and PyTorch
 
@@ -6583,3 +6593,981 @@ w_{i,t+1} = (1-\lambda\gamma) w_{i,t} - \lambda\frac{\widehat{m}_{i,t}}{\sqrt{\w
 $$
 
 where $g_{i,t}$ excludes the weight-decay term, and $\gamma \ge 0$ is the weight-decay coefficient (called `weight_decay` in the code), starting from $m_{i,0} = 0$ and $v_{i,0} = 0$.
+
+## Week 07 - Regularization and Normalization
+
+### Task 01
+
+**Description:**
+
+Create a script that builds a two-hidden-layer `Tanh` MLP (ex. `10 -> 64 -> 64 -> 1`), trains it on a small (20-example) synthetic linear-regression dataset, and evaluates it on a larger (200-example) held-out set drawn from the same distribution after every epoch.
+
+For each example, sample standard-normal inputs `(n, 10)`, then standard-normal noise/error `(n, 1)` scaled by `0.1`. The targets would be `x @ true_w + noise`, where `true_w` is `(10, 1)` standard-normal sampled using a separate generator. Train for 300 full-batch epochs with MSE and learning rate `0.01`.
+
+Plot the train and test loss curves over training and print the final train loss and test loss.
+
+> [!NOTE]
+> If you can produce the same outcome with another/simpler architecture or training process, this is completely fine for the task.
+
+**Acceptance criteria:**
+
+- The trend of the below graph is reproduced.
+
+**Example output:**
+
+```bash
+python run.py -w 7 -t 1
+```
+
+```text
+Final losses: train loss = 0.0000, test loss = 6.1239
+```
+
+![w07_task01_overfitting.png](assets/w07_task01_overfitting.png "w07_task01_overfitting.png")
+
+<details>
+<summary>How can we interpret this chart?</summary>
+
+We see overfitting!
+
+The train loss collapses to zero while the test loss keeps climbing: the model has memorized its 20 training examples instead of learning the underlying linear relationship.
+
+</details>
+
+<details>
+<summary>How can we solve this?</summary>
+
+We can add regularization and counter the high variance by introducing bias.
+
+One of the ways this can be done is weight decay / L2 regularization.
+
+Another is Dropout and that's what we'll use today.
+
+</details>
+
+<details>
+<summary>What is the added value of Dropout?</summary>
+
+It does regularization by introducing bias into the network while it is training.
+
+The general idea is to zero out a randomly chosen number of activations of the preceding layer.
+
+> [!NOTE]
+> Read the paper that introduced Dropout: Srivastava, Hinton, Krizhevsky, Sutskever, Salakhutdinov, ["Dropout: A Simple Way to Prevent Neural Networks from Overfitting"](https://jmlr.org/papers/v15/srivastava14a.html), JMLR 2014.
+
+</details>
+
+<details>
+<summary>Which figure in the paper provides an example of this?</summary>
+
+![w07_dropout_example.png](assets/w07_dropout_example.png "w07_dropout_example.png")
+
+</details>
+
+<details>
+<summary>Does it also do that during inference/validation time?</summary>
+
+No - then the predictions use the full network.
+
+</details>
+
+<details>
+<summary>Which figure in the paper provides an example of this?</summary>
+
+![w07_dropout_inference.png](assets/w07_dropout_inference.png "w07_dropout_inference.png")
+
+</details>
+
+<details>
+<summary>How would be able to deal with this switch programmatically?</summary>
+
+We have to use the state of the module. We'll need to have a property - `training`, of each instance of `nn.Module` that'll dictate the behavior of the module when it is called.
+
+</details>
+
+### Task 02
+
+**Description:**
+
+Add a `training` flag on `Module`, defaulting to `True`, together with `train()` and `eval()` methods that set it to `True` and `False`.
+
+`Sequential` overrides both methods so that calling `train()`/`eval()` on it also calls `train()`/`eval()` on every submodule it holds, including submodules nested inside another `Sequential`.
+
+**Acceptance criteria:**
+
+- The flag `training` is implemented.
+
+**Test cases:**
+
+See `tests/test_dl_lib/test_nn/test_module.py` and `tests/test_dl_lib/test_nn/test_sequential.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 7 -t 2
+```
+
+```text
+Before eval: outer.training = True, inner.training = True
+After eval:  outer.training = False, inner.training = False
+After train: outer.training = True, inner.training = True
+```
+
+Let's say we have created a dropout layer with `p=0.5` and it receives the following input:
+
+$$
+x = [1,1,1,1,1,1,1,1]
+$$
+
+<details>
+<summary>Open the PyTorch documentation - is <code>p</code> the probability of keeping or zeroing an activation?</summary>
+
+It is the probability to zero out an element:
+
+![w07_dropout_docs.png](assets/w07_dropout_docs.png "w07_dropout_docs.png")
+
+</details>
+
+<details>
+<summary>What about in the paper?</summary>
+
+> [!IMPORTANT]
+> In the paper (<https://jmlr.org/papers/v15/srivastava14a.html>) `p` is the probability to keep an element!
+
+</details>
+
+<details>
+<summary>What is the next step?</summary>
+
+We sample a random mask for each element. You can think of it as throwing a coin `len(x)` times. Suppose this call produces:
+
+$$
+m = [0,1,0,0,0,1,0,1]
+$$
+
+</details>
+
+<details>
+<summary>What is the next step?</summary>
+
+We apply the mask:
+
+$$
+\widetilde{x} = x \odot m
+$$
+
+and get:
+
+$$
+\widetilde{x} = [0,1,0,0,0,1,0,1]
+$$
+
+</details>
+
+Suppose the next neuron adds these eight values using weights of \(2\) and a bias of \(-8\):
+
+$$
+z = 2\sum_{i=1}^{8}\widetilde{x}_i - 8.
+$$
+
+During training, four values survive on average (because `p=0.5`), so its average weighted input is:
+
+$$
+\mathbb{E}[z_{\text{train}}] = 2(4)-8=0.
+$$
+
+For our particular mask, only three survive, giving \(z=2(3)-8=-2\).
+
+During evaluation, dropout is disabled and all eight values reach the neuron:
+
+$$
+z_{\text{eval}} = 2(8)-8=8.
+$$
+
+The weights and bias have not changed, but the neuron's input has shifted from a training average of \(0\) to an evaluation value of \(8\).
+
+<details>
+<summary>What is the problem we have?</summary>
+
+The learned weights and bias are not suited to this new input scale.
+
+</details>
+
+<details>
+<summary>How do we solve this?</summary>
+
+We **scale surviving values** by \(1/(1-p)\).
+
+With \(p=0.5\), this doubles them:
+
+$$
+y = \frac{x \odot m}{1-p}
+= [0,2,0,0,0,2,0,2].
+$$
+
+Now four values survive on average, each contributing \(2\). Their expected sum is \(8\), so the same neuron's average weighted input becomes:
+
+$$
+\mathbb{E}[z_{\text{train,scaled}}]
+=2(4\times2)-8
+=8.
+$$
+
+During evaluation, all eight original values pass through unchanged:
+
+$$
+z_{\text{eval}}=2(8)-8=8.
+$$
+
+The expected training input now matches the evaluation input.
+
+Individual masks still produce fluctuations but switching off dropout no longer introduces a systematic shift in the mean.
+
+</details>
+
+During backpropagation we reuse the mask. For each element:
+
+\[
+y_i=\frac{w_i m_i}{1-p}.
+\]
+
+The sampled mask \(m_i\) is treated as constant, so:
+
+\[
+\frac{\partial y_i}{\partial w_i}
+= \frac{m_i}{1-p}
+\underbrace{\frac{\partial w_i}{\partial w_i}}_{1}
+= \frac{m_i}{1-p}.
+\]
+
+Applying the chain rule:
+
+\[
+\boxed{
+\frac{\partial\mathcal L}{\partial w_i}
+= \frac{\partial\mathcal L}{\partial y_i}
+\frac{\partial y_i}{\partial w_i}
+= \frac{\partial\mathcal L}{\partial y_i}
+\frac{m_i}{1-p}
+}
+\]
+
+<details>
+<summary>What gradient do masked elements receive?</summary>
+
+\(m_i=0\) => zero gradient
+
+</details>
+
+<details>
+<summary>What about surviving elements?</summary>
+
+They receive the incoming gradient multiplied by \(1/(1-p)\), matching the forward-pass scaling.
+
+</details>
+
+### Task 03
+
+**Description:**
+
+Define the `Dropout` class. It provides:
+
+- construction: takes a drop probability `p`, defaulting to `0.5`. Raises `ValueError` if `p` is outside `[0, 1]`.
+- `forward`: in evaluation mode, or when `p` is `0.0`, returns the input unchanged. In training mode, zeroes each element independently with probability `p`, and scales every surviving element.
+
+Rerun the previous task with dropout layers inserted after each hidden layer's activations and plot the train/test loss curves.
+
+**Acceptance criteria:**
+
+- The effects of `Dropout` are visualized.
+
+**Test cases:**
+
+See `tests/test_dl_lib/test_nn/test_dropout.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 7 -t 3
+```
+
+```text
+With Dropout: train loss = 2.7817, test loss = 2.2676
+```
+
+![w07_task03_dropout_narrows_gap.png](assets/w07_task03_dropout_narrows_gap.png "w07_task03_dropout_narrows_gap.png")
+
+### Task 04
+
+**Description:**
+
+Apply the script from the first task on one synthetic dataset of `128` examples, without noise or a held-out set.
+
+This time build a `12` hidden linear layers of width `32`, placing `Tanh` in-between, followed by a final `32 -> 1` output layer. Initialize weights as standard-normal values scaled by `0.1` and set biases to zero. Train for 50 epochs with a learning rate of `0.01`.
+
+Objectives:
+
+- Print three training losses: the MSE at epochs `0`, `25`, and `49` (the first, middle, and last epochs). Record each loss before updating the model's parameters.
+- Measure the gradients of the layers: use the weight gradients calculated during the final epoch's backward pass. Take the absolute value of every weight gradient, then average them to obtain one number per layer. Do not include bias gradients.
+- Print the 13 gradient averages: list them in order, starting with the first hidden layer and ending with the output layer.
+- Plot the gradient averages: use layer numbers `1–13` on the x-axis and their gradient averages on a logarithmic y-axis. A logarithmic scale makes very small values and differences between layers easier to see.
+
+> [!NOTE]
+> If you can produce the same outcome with another/simpler architecture or training process, this is completely fine for the task.
+
+**Acceptance criteria:**
+
+- The trend in the below graph is reproduced.
+
+**Example output:**
+
+```bash
+python run.py -w 7 -t 4
+```
+
+```text
+Without BatchNorm1d: loss[0] = 7.4629, loss[25] = 7.4627, loss[-1] = 7.4626
+Without BatchNorm1d: gradient magnitude per layer = [0.00017717968148645014, 8.156227704603225e-05, 8.813239401206374e-05, 0.00010215472138952464, 9.533659613225609e-05, 8.347261609742418e-05, 8.155079558491707e-05, 0.00010097638005390763, 9.482887253398076e-05, 0.00010848169040400535, 9.530266834190115e-05, 8.592824451625347e-05, 0.0005417605862021446]
+```
+
+![w07_task04_vanishing_gradients.png](assets/w07_task04_vanishing_gradients.png "w07_task04_vanishing_gradients.png")
+
+<details>
+<summary>What does this chart show?</summary>
+
+The loss is frozen to four decimal places across all 50 epochs, and every layer's gradient magnitude sits in the same tiny `1e-4`-`1e-5` band regardless of depth: a textbook example of a **vanishing gradient**.
+
+</details>
+
+<details>
+<summary>How can we solve this?</summary>
+
+We mentioned several possible ways:
+
+- smarter weight initialization;
+  - the biases may help here.
+- smarter input preprocessing;
+- maybe the activation function is not appropriate;
+- residual connections.
+
+Today we'll look at another way of solving this - **batch normalization**!
+
+> [!NOTE]
+> Read the paper that introduced BatchNorm: Ioffe, Szegedy, ["Batch Normalization: Accelerating Deep Network Training by Reducing Internal Covariate Shift"](https://arxiv.org/abs/1502.03167), ICML 2015.
+
+</details>
+
+<details>
+<summary>How does BatchNorm1d behave during training?</summary>
+
+For each feature, it normalizes the current batch to zero mean and unit variance, using that batch's own mean and variance, then applies a learnable per-feature scale: `gamma`, and shift: `beta`.
+
+</details>
+
+Let's say we have a batch normalization layer. During training, we get this batch:
+
+$$
+X = \begin{bmatrix}
+1 & 10 \\
+1 & 18 \\
+5 & 10 \\
+5 & 18
+\end{bmatrix}.
+$$
+
+Each **row is an example**, and each **column is a feature**.
+
+<details>
+<summary>What is our first step?</summary>
+
+Batch normalization treats each feature separately, using its values across the batch:
+
+- First feature: $[1,1,5,5]$
+- Second feature: $[10,18,10,18]$
+
+We calculate one mean and one variance per column:
+
+$$
+\mu_1 = \frac{1+1+5+5}{4}=3
+$$
+
+$$
+\mu_2 = \frac{10+18+10+18}{4}=14
+$$
+
+So the batch mean is:
+
+$$
+\mu=[3,14].
+$$
+
+Subtracting it from every row gives:
+
+$$
+X-\mu = \begin{bmatrix}
+-2 & -4 \\
+-2 & 4 \\
+2 & -4 \\
+2 & 4
+\end{bmatrix}.
+$$
+
+Both columns now have zero mean, but their scales still differ.
+
+</details>
+
+<details>
+<summary>What is our next step?</summary>
+
+Calculate each feature's **biased variance**: the average squared distance from its mean, dividing by the batch size $N=4$.
+
+$$
+v_1=\frac{(-2)^2+(-2)^2+2^2+2^2}{4}=4
+$$
+
+$$
+v_2=\frac{(-4)^2+4^2+(-4)^2+4^2}{4}=16.
+$$
+
+Divide the centered values by their feature's standard deviation:
+
+$$
+\widehat{X}=\frac{X-\mu}{\sqrt{v+\varepsilon}}.
+$$
+
+Ignoring the tiny $\varepsilon$ for this calculation:
+
+$$
+\widehat{X} = \begin{bmatrix}
+-1 & -1 \\
+-1 & 1 \\
+1 & -1 \\
+1 & 1
+\end{bmatrix}.
+$$
+
+Each column now has zero mean and unit variance.
+
+</details>
+
+<details>
+<summary>What is our next step?</summary>
+
+We apply a (learnable) scale $\gamma$ and a (learnable) shift $\beta$ for each feature:
+
+$$
+Y=\gamma\odot\widehat{X}+\beta.
+$$
+
+Initially:
+
+$$
+\gamma=[1,1],\qquad \beta=[0,0],
+$$
+
+so the normalized values pass through unchanged.
+
+Suppose training later learns:
+
+$$
+\gamma=[2,0.5],\qquad \beta=[1,-1].
+$$
+
+Then our output becomes approximately:
+
+$$
+Y= \begin{bmatrix}
+-1 & -1.5 \\
+-1 & -0.5 \\
+3 & -1.5 \\
+3 & -0.5
+\end{bmatrix}.
+$$
+
+The network can learn the scale and offset it needs after normalization.
+
+</details>
+
+<details>
+<summary>What is our next step?</summary>
+
+We maintain two non-learnable values per feature:
+
+- `running_mean`, initially $[0,0]$.
+- `running_var`, initially $[1,1]$.
+
+During training, update each using:
+
+$$
+\text{running}
+\leftarrow
+(1-m)\,\text{running}+m\,\text{batch statistic},
+$$
+
+where $m$ is `momentum`, defaulting to $0.1$.
+
+For our batch:
+
+$$
+\text{running mean}
+=0.9[0,0]+0.1[3,14]
+=[0.3,1.4].
+$$
+
+To match PyTorch, the running variance uses the **unbiased** batch variance, dividing by $N-1$:
+
+$$
+v_{\text{unbiased}}
+=\frac{N}{N-1}v
+=\left[\frac{16}{3},\frac{64}{3}\right].
+$$
+
+Therefore:
+
+$$
+\text{running variance}
+=0.9[1,1]+0.1
+\left[\frac{16}{3},\frac{64}{3}\right]
+\approx[1.4333,3.0333].
+$$
+
+These updates do not participate in gradient computation.
+
+</details>
+
+<details>
+<summary>What changes when we call <code>eval()</code>?</summary>
+
+The layer uses the saved statistics:
+
+$$
+Y= \gamma\odot
+\frac{X-\text{running mean}}
+{\sqrt{\text{running variance}+\varepsilon}}
++\beta.
+$$
+
+</details>
+
+During backpropagation gradients flow through the normalization, including the batch mean and variance.
+
+Unlike dropout's sampled mask, these statistics **depend on the inputs**. We must account for that dependence.
+
+For one feature, let:
+
+$$
+g_i=\frac{\partial\mathcal L}{\partial y_i}.
+$$
+
+The learnable parameters receive:
+
+$$
+\frac{\partial\mathcal L}{\partial\beta}
+=\sum_i g_i,
+\qquad
+\frac{\partial\mathcal L}{\partial\gamma}
+=\sum_i g_i\widehat{x}_i.
+$$
+
+The input gradient is:
+
+$$
+\boxed{
+\frac{\partial\mathcal L}{\partial x_i}
+= \frac{\gamma}{\sqrt{v+\varepsilon}}
+\left(
+g_i-\operatorname{mean}(g)
+-\widehat{x}_i\operatorname{mean}(g\widehat{x})
+\right)
+}
+$$
+
+All means and sums here run over the batch for that feature.
+
+### Task 05
+
+**Description:**
+
+Define the class `BatchNorm1d`. It should provide:
+
+- construction: accept `num_features`, `eps=1e-5`, and `momentum=0.1`. Create learnable per-feature `gamma` (ones) and `beta` (zeros), plus non-learnable `running_mean` (zeros) and `running_var` (ones).
+- `forward` when training: compute each feature's batch mean and biased variance. Return `gamma * (x - mean) / sqrt(variance + eps) + beta`. Update running statistics without tracking gradients, using `(1 - momentum) * running + momentum * batch_stat`. Use the unbiased batch variance for updating `running_var`.
+- `forward` when not training: normalize using running statistics, apply `gamma` and `beta`, and leave running statistics unchanged.
+- `parameters`: return only `gamma` and `beta`.
+
+Create a demonstration script that:
+
+- Prints input/output feature means and biased variances during training.
+- Prints running statistics before and after one training call, then switches to evaluation and prints the output mean.
+- Repeats Task 04 with `BatchNorm1d` before every `Tanh`, keeping its data, initialization, and training settings. Print the same losses and gradient measurements, and save a logarithmic gradient plot for comparison.
+
+**Acceptance criteria:**
+
+- Compared with Task 04, loss falls substantially and early-layer gradients are larger.
+
+**Test cases:**
+
+See `tests/test_dl_lib/test_nn/test_normalization.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 7 -t 5
+```
+
+```text
+gamma = tensor([1., 1., 1.], requires_grad=True)
+beta  = tensor([0., 0., 0.], requires_grad=True)
+x.mean(dim=0) = tensor([ 4.6368,  0.5793, -3.1433])
+x.var(dim=0, unbiased=False) = tensor([11.9421, 12.4851, 18.8823])
+batch_norm(x).mean(dim=0) = tensor([ 2.9802e-08,  3.7253e-08, -2.9802e-08], grad_fn=<MeanBackward1>)
+batch_norm(x).var(dim=0, unbiased=False) = tensor([1.0000, 1.0000, 1.0000], grad_fn=<VarBackward0>)
+Before any forward call: running_mean = tensor([0., 0., 0.])
+                         running_var  = tensor([1., 1., 1.])
+After one training call: running_mean = tensor([0.1788, 0.1956, 0.2559])
+                         running_var  = tensor([3.9490, 4.8103, 2.5452])
+Evaluating: batch_norm(x).mean(dim=0) = tensor([0.8099, 0.8027, 1.4436], grad_fn=<MeanBackward1>)
+With BatchNorm1d: loss[0] = 7.4267, loss[25] = 0.5486, loss[-1] = 0.3091
+With BatchNorm1d: gradient magnitude per layer = [0.12924525141716003, 0.06648257374763489, 0.05176399275660515, 0.04867493733763695, 0.05708292871713638, 0.06382918357849121, 0.060660116374492645, 0.05594765394926071, 0.06290805339813232, 0.05174217373132706, 0.03969079628586769, 0.01466367021203041, 0.06459763646125793]
+```
+
+![w07_task05_batchnorm_recovers_gradients.png](assets/w07_task05_batchnorm_recovers_gradients.png "w07_task05_batchnorm_recovers_gradients.png")
+
+Compare the training run to Task 04:
+
+- the loss collapses from 7.4267 to 0.3091 instead of staying frozen near 7.46;
+- and every layer's gradient magnitude now sits in the `0.01`-`0.13` range, two to three orders of magnitude larger than Task 04's vanished `1e-4`-`1e-5` band.
+
+### Task 06
+
+**Description:**
+
+Create a script that builds a single `BatchNorm1d` layer and a fixed example `x_fixed`.
+
+For each of three batch sizes (64, 8, and 2), it runs 30 trials: each trial surrounds `x_fixed` with freshly sampled random companions filling out the rest of the batch, and normalizes the whole batch.
+
+It collects `x_fixed`'s normalized output across the 30 trials, computes its standard deviation, and prints one line per batch size.
+
+It also plots the standard deviation against batch size.
+
+**Acceptance criteria:**
+
+- The standard deviation of `x_fixed`'s normalized output grows as batch size shrinks.
+
+**Example output:**
+
+```bash
+python run.py -w 7 -t 6
+```
+
+```text
+Batch size 64: std of BatchNorm1d(x_fixed) across 30 random batches = 0.1458
+Batch size 8: std of BatchNorm1d(x_fixed) across 30 random batches = 0.4098
+Batch size 2: std of BatchNorm1d(x_fixed) across 30 random batches = 0.8062
+```
+
+![w07_task06_batchnorm_batch_size.png](assets/w07_task06_batchnorm_batch_size.png "w07_task06_batchnorm_batch_size.png")
+
+<details>
+<summary>What is the limitation of BatchNorm?</summary>
+
+One example can affect another example's gradient.
+
+During training, examples share the batch mean and variance. Changing one example can change both the outputs and the input gradients of other examples.
+
+We can see that in the graph above: the same layer, the same fixed input, and yet its normalized output's standard deviation across repeated random batches is nearly six times higher at batch size 2 than at batch size 64, purely because of which other examples happened to share the batch.
+
+</details>
+
+LayerNorm can solve this. It normalizes each example using only that example's own features, never another example's.
+
+There is nothing batch-dependent to estimate or to fall back on, so the same computation applies unchanged whether the layer is training or evaluating.
+
+Read the paper that introduced LayerNorm: LayerNorm: Ba, Kiros, Hinton, ["Layer Normalization"](https://arxiv.org/abs/1607.06450), 2016.
+
+Let's create a `LayerNorm` layer and it receives two examples, each containing four features:
+
+$$
+X= \begin{bmatrix}
+1 & 1 & 5 & 5\\
+10 & 18 & 10 & 18
+\end{bmatrix}.
+$$
+
+<details>
+<summary>What is our first step?</summary>
+
+Layer normalization treats each example separately:
+
+- First example: $[1,1,5,5]$
+- Second example: $[10,18,10,18]$
+
+We calculate one mean and one variance **per row**, across its four features.
+
+For the first example:
+
+$$
+\mu_1=\frac{1+1+5+5}{4}=3.
+$$
+
+For the second:
+
+$$
+\mu_2=\frac{10+18+10+18}{4}=14.
+$$
+
+Subtract each example's mean from its features:
+
+$$
+X-\mu= \begin{bmatrix}
+-2 & -2 & 2 & 2\\
+-4 & 4 & -4 & 4
+\end{bmatrix}.
+$$
+
+Each row now has zero mean.
+
+</details>
+
+<details>
+<summary>What is our next setup?</summary>
+
+Calculate each example's **biased variance**, dividing by its number of features, $D=4$:
+
+$$
+v_1=\frac{(-2)^2+(-2)^2+2^2+2^2}{4}=4.
+$$
+
+$$
+v_2=\frac{(-4)^2+4^2+(-4)^2+4^2}{4}=16.
+$$
+
+Divide each centered row by its own standard deviation:
+
+$$
+\widehat{x}_{ij}
+= \frac{x_{ij}-\mu_i}{\sqrt{v_i+\varepsilon}}.
+$$
+
+Ignoring the tiny $\varepsilon$ for this calculation:
+
+$$
+\widehat{X}= \begin{bmatrix}
+-1 & -1 & 1 & 1\\
+-1 & 1 & -1 & 1
+\end{bmatrix}.
+$$
+
+Each row now has zero mean and unit variance.
+
+</details>
+
+<details>
+<summary>What is our next step?</summary>
+
+There is one learnable scale and shift **per feature**, shared across examples:
+
+$$
+y_{ij}=\gamma_j\widehat{x}_{ij}+\beta_j.
+$$
+
+Initially:
+
+$$
+\gamma=[1,1,1,1],
+\qquad
+\beta=[0,0,0,0].
+$$
+
+Suppose training later learns:
+
+$$
+\gamma=[2,2,0.5,0.5],
+\qquad
+\beta=[1,1,-1,-1].
+$$
+
+Our output becomes approximately:
+
+$$
+Y= \begin{bmatrix}
+-1 & -1 & -0.5 & -0.5\\
+-1 & 3 & -1.5 & -0.5
+\end{bmatrix}.
+$$
+
+The normalization statistics belong to each **example**, while the learnable parameters belong to each **feature**.
+
+</details>
+
+<details>
+<summary>What changes when we call <code>eval()</code>?</summary>
+
+Nothing in the layer's calculation.
+
+During both training and evaluation, LayerNorm uses each example's own feature mean and variance:
+
+$$
+y_{ij}
+= \gamma_j
+\frac{x_{ij}-\mu_i}{\sqrt{v_i+\varepsilon}}
++\beta_j.
+$$
+
+There are no running statistics or momentum updates.
+
+With the same input and parameters, training-mode and evaluation-mode outputs are identical.
+
+</details>
+
+During backpropagation gradients flow through each example's mean and variance, as well as through $\gamma$ and $\beta$.
+
+Let:
+
+$$
+g_{ij}=\frac{\partial\mathcal L}{\partial y_{ij}}.
+$$
+
+Because the learnable parameters are shared across examples:
+
+$$
+\frac{\partial\mathcal L}{\partial\beta_j}
+=\sum_i g_{ij},
+\qquad
+\frac{\partial\mathcal L}{\partial\gamma_j}
+=\sum_i g_{ij}\widehat{x}_{ij}.
+$$
+
+To calculate input gradients, first include each feature's scale:
+
+$$
+h_{ij}=g_{ij}\gamma_j.
+$$
+
+Then, for each example:
+
+$$
+\boxed{
+\frac{\partial\mathcal L}{\partial x_{ij}}
+= \frac{
+h_{ij}
+-\operatorname{mean}_j(h_{ij})
+-\widehat{x}_{ij}\operatorname{mean}_j(h_{ij}\widehat{x}_{ij})
+}{
+\sqrt{v_i+\varepsilon}
+}
+}
+$$
+
+Here, both means run across the features of that example.
+
+<details>
+<summary>Can one feature affect another feature's gradient?</summary>
+
+Yes. Features within an example share its mean and variance, so their gradients are connected.
+
+</details>
+
+<details>
+<summary>Can one example affect another example's gradient?</summary>
+
+No - layer normalization does not connect different examples.
+
+Each example's statistics are calculated independently, during both training and evaluation.
+
+</details>
+
+### Task 07
+
+**Description:**
+
+Task 06 showed that BatchNorm1d's output for one example depends on which other examples share its batch.
+LayerNorm solves this by normalizing each example independently of every other example in the batch.
+
+Define the `LayerNorm` class in `dl_lib.nn.normalization`, extending `Module`. It provides:
+
+- **construction**: takes `normalized_shape`, and a defaulting argument `eps=1e-5`. It creates a learnable `gamma` (initialized to ones) and `beta` (initialized to zeros), matching `normalized_shape`.
+- **forward**: normalizes each example along its feature dimension to zero mean and unit variance, using `eps` for numerical stability, then scales by `gamma` and shifts by `beta`. This computation does not depend on the `training` flag.
+- **parameters**: return only `gamma` and `beta`.
+
+Create a script that builds a `LayerNorm`, and prints an input alongside its training-mode and evaluation-mode outputs, together with whether the two are identical.
+The same script then reuses Task 06's exact fixed-example-with-random-companions experiment, this time normalizing with `LayerNorm` instead of `BatchNorm1d`, and plots its own standard-deviation-vs-batch-size graph so it can be compared side by side with Task 06's.
+
+**Acceptance criteria:**
+
+- The standard deviation of `x_fixed`'s normalized output is (numerically) zero at every batch size.
+
+**Test cases:**
+
+See `tests/test_dl_lib/test_nn/test_normalization.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 7 -t 7
+```
+
+```text
+x = tensor([[ 4.0820,  0.4131, -3.3576,  2.1369],
+        [-1.1690, -1.7972,  1.8067,  2.6761],
+        [-0.4385,  0.1933, -0.1933,  1.3641]])
+Training:   layer_norm(x) = tensor([[ 1.1918, -0.1481, -1.5251,  0.4814],
+        [-0.8146, -1.1452,  0.7512,  1.2086],
+        [-0.9686, -0.0551, -0.6140,  1.6376]], grad_fn=<AddBackward0>)
+Evaluating: layer_norm(x) = tensor([[ 1.1918, -0.1481, -1.5251,  0.4814],
+        [-0.8146, -1.1452,  0.7512,  1.2086],
+        [-0.9686, -0.0551, -0.6140,  1.6376]], grad_fn=<AddBackward0>)
+Identical regardless of mode: True
+Batch size 64: std of LayerNorm(x_fixed) across 30 random batches = 0.0000
+Batch size 8: std of LayerNorm(x_fixed) across 30 random batches = 0.0000
+Batch size 2: std of LayerNorm(x_fixed) across 30 random batches = 0.0000
+```
+
+![w07_task07_layernorm_stable.png](assets/w07_task07_layernorm_stable.png "w07_task07_layernorm_stable.png")
+
+Where Task 06's `BatchNorm1d` showed a standard deviation growing to 0.8062 at batch size 2, `LayerNorm`'s output for the same fixed example never moves at all, regardless of its batchmates: it is a flat line at zero across all three batch sizes.
+
+### Task 08
+
+**Description:**
+
+This task closes the week with a single model report that puts Dropout, BatchNorm1d, and LayerNorm on the same footing, using the overfitting setup from Task 01.
+
+Create a script that trains four models on Task 01's 20-example dataset, and evaluates each on its 200-example test set:
+
+- a plain two-hidden-layer `Tanh` MLP (Task 01's baseline);
+- the same MLP with `Dropout(p=0.5)` after each hidden layer (Task 03);
+- the same MLP with `BatchNorm1d` before each hidden layer's `Tanh` (Task 05);
+- the same MLP with `LayerNorm` before each hidden layer's `Tanh` (Task 07).
+
+It computes each model's test-set $R^2$ against a mean-predictor baseline, prints a model report table with one row per model and a short comment, and names the best model.
+
+**Acceptance criteria:**
+
+- A draft model report is created.
+
+**Example output:**
+
+```bash
+python run.py -w 7 -t 8
+```
+
+```text
+model             test r2  comment
+baseline           0.0000  mean predictor, ignores x
+plain MLP          0.5319  no regularization, overfits the 20-example train set
++Dropout           0.1211  randomly zeroes activations, narrows the train/test gap
++BatchNorm1d       0.4549  normalizes over the batch, mainly a training stabilizer here
++LayerNorm         0.3401  normalizes per sample, stable even with this tiny batch
+Best model: plain MLP (test r2 = 0.5319)
+```
+
+### Task 09
+
+**Description:**
+
+Create a script that tries to beat Task 08's model report.
+
+**Acceptance criteria:**
+
+- A higher $R^2$ is obtained.
