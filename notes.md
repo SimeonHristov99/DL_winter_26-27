@@ -119,6 +119,39 @@
     - [Task 07](#task-07-6)
     - [Task 08](#task-08-6)
     - [Task 09](#task-09-6)
+  - [Week 08 - Convolutional Neural Networks](#week-08---convolutional-neural-networks)
+    - [ImageNet](#imagenet)
+      - [Task 01](#task-01-7)
+    - [Class-Based PyTorch Model](#class-based-pytorch-model)
+    - [Working with images in PyTorch](#working-with-images-in-pytorch)
+    - [The Clouds dataset](#the-clouds-dataset)
+    - [Converting pixels to tensors and tensors to pixels](#converting-pixels-to-tensors-and-tensors-to-pixels)
+    - [Loading images with PyTorch](#loading-images-with-pytorch)
+    - [Data augmentation](#data-augmentation)
+    - [Convolutional Neural Networks](#convolutional-neural-networks)
+    - [Visualizing the weights](#visualizing-the-weights)
+    - [Convolutions in different dimensions](#convolutions-in-different-dimensions)
+      - [Task 02](#task-02-7)
+      - [Task 03](#task-03-7)
+      - [Task 04](#task-04-7)
+      - [Task 05](#task-05-7)
+      - [Task 06](#task-06-7)
+      - [Task 07](#task-07-7)
+      - [Task 08](#task-08-7)
+      - [Task 09](#task-09-7)
+    - [The Model Report File](#the-model-report-file)
+    - [Precision \& Recall for Multiclass Classification (revisited)](#precision--recall-for-multiclass-classification-revisited)
+      - [Computing total value](#computing-total-value)
+      - [Computing per class value](#computing-per-class-value)
+    - [FashionMNIST](#fashionmnist)
+      - [Task 10](#task-10-6)
+      - [Task 11](#task-11-5)
+    - [CIFAR-10](#cifar-10)
+      - [Task 12](#task-12-5)
+      - [Task 13](#task-13-5)
+    - [Clouds](#clouds)
+      - [Task 14](#task-14-4)
+      - [Task 15](#task-15-2)
 
 ## Week 01 - Introduction to NumPy, Matplotlib and PyTorch
 
@@ -7571,3 +7604,1350 @@ Create a script that tries to beat Task 08's model report.
 **Acceptance criteria:**
 
 - A higher $R^2$ is obtained.
+
+## Week 08 - Convolutional Neural Networks
+
+### ImageNet
+
+Today we'll look at the paper that arguably started the deep learning evolution:
+
+Krizhevsky, Sutskever, and Hinton, "ImageNet Classification with Deep Convolutional Neural Networks": <https://proceedings.neurips.cc/paper/2012/hash/c399862d3b9d6b76c8436e924a68c45b-Abstract.html>
+
+Let's analyze it!
+
+<details>
+<summary>Read the abstract - what did the authors achieve?</summary>
+
+They created a neural network that classifies an image into one of $1000$ classes.
+
+</details>
+
+<details>
+<summary>What dataset did they use?</summary>
+
+[Wikipedia](https://en.wikipedia.org/wiki/ImageNet): *The ImageNet project is a large visual database designed for use in visual object recognition software research.*.
+
+It has more than 14 million total images categorized into a total of 21,841 classes (or in ImageNet's terms - `synset`s).
+
+They used a subset of the original dataset, called "ImageNet-1K" (sometimes also referred to as "ImageNet Large Scale Visual Recognition Challenge (ILSVRC) 2010"). You can explore it [on Hugging Face](https://huggingface.co/datasets/ILSVRC/imagenet-1k).
+
+</details>
+
+<details>
+<summary>Which figure provides examples of the instances in ImageNet-1K?</summary>
+
+![w08_imagenet_samples.png](assets/w08_imagenet_samples.png "w08_imagenet_samples.png")
+
+</details>
+
+<details>
+<summary>What metrics did they observe?</summary>
+
+![w08_alexnet_error_rates.png](assets/w08_alexnet_error_rates.png "w08_alexnet_error_rates.png")
+
+</details>
+
+<details>
+<summary>What is this term "error rate" - what does it mean?</summary>
+
+It is the complement of accuracy: `error rate = 100% - accuracy`.
+
+</details>
+
+<details>
+<summary>But wait - didn't we say accuracy is bad?</summary>
+
+Yep, it is.
+
+And the dataset they used is not balanced, though they do not give any statistics on the class distribution.
+
+</details>
+
+<details>
+<summary>So why did they use this "metric"?</summary>
+
+Because everybody else did it. Afterwards, this did change and most papers started using mainly the F1 score.
+
+</details>
+
+<details>
+<summary>How do we interpret the top-1 error rate then?</summary>
+
+It is the percentage of images where its highest-ranked class is wrong.
+
+AlexNet's $37.5\%$ top-1 error means it got the top prediction **right on $62.5\%$ of test images**.
+
+</details>
+
+<details>
+<summary>How do we interpret the top-5 error rate?</summary>
+
+It is the percentage where the correct class wasn’t among its five highest-ranked guesses.
+
+Its $17.0\%$ top-5 error means **the correct class appeared in the top five for $83.0\%$ of the test images**.
+
+</details>
+
+<details>
+<summary>Which section talks about the performance of the runner up?</summary>
+
+![w08_imagenet_results_runner.png](assets/w08_imagenet_results_runner.png "w08_imagenet_results_runner.png")
+
+</details>
+
+<details>
+<summary>What type of neural network did the runner up use?</summary>
+
+They did not use a neural network!
+
+Instead they used a complex system of hand-engineered features and passed them on to (ML) classifiers (often SVM or similar).
+
+![w08_imagenet_intro.png](assets/w08_imagenet_intro.png "w08_imagenet_intro.png")
+
+</details>
+
+<details>
+<summary>Which table shows comparison with previous winners?</summary>
+
+![w08_imagenet_results_table.png](assets/w08_imagenet_results_table.png "w08_imagenet_results_table.png")
+
+</details>
+
+And this paper changed everything - look at what the future models achieved:
+
+![w08_imagenet_results.png](assets/w08_imagenet_results.png "w08_imagenet_results.png")
+
+<details>
+<summary>Do you know the name of the model in 2015?</summary>
+
+ReNet - we'll talk about it next time.
+
+</details>
+
+<details>
+<summary>What was the other breakthrough the authors talked about?</summary>
+
+This was the first paper to also show that you can use GPUs / CUDA to train deep neural networks.
+
+</details>
+
+#### Task 01
+
+**Description:**
+
+Define the `Conv1d` class. It provides:
+
+- `construction`: takes `in_channels` (default `1`), `out_channels` (default `1`), `kernel_size`, `stride` (default `1`), and `padding` (default `0`). It creates a `weight` tensor and a `bias` tensor, shaped and initialized the same way `torch.nn.Conv1d` shapes and initializes its own `weight` and `bias`, with `requires_grad=True`.
+- `forward`: takes a single-channel, unbatched signal shaped `(in_channels, length)` (`(1, length)` for this task) and computes each output position by summing the `kernel_size` products of the input window and the kernel, plus the bias.
+- `parameters`: returns the weight and bias.
+
+Create a script that copies a real `torch.nn.Conv1d(1, 1, kernel_size)`'s weight and bias into our `Conv1d` under `torch.no_grad()`, runs both on the same random input, and prints whether the two outputs match.
+
+**Acceptance criteria:**
+
+- A simple convolution in 1D is implemented.
+
+**Test cases:** See `tests/test_dl_lib/test_vision/test_conv.py`:
+
+- `TestConv1dInit`;
+- `TestConv1dParameters`;
+- `TestConv1dForward.test_when_input_is_unbatched_then_output_is_unbatched`;
+- `TestConv1dForward.test_when_single_channel_unbatched_then_matches_torch_nn_conv1d`.
+
+**Example output:**
+
+```bash
+python run.py -w 8 -t 1
+```
+
+```text
+Copied torch.nn.Conv1d's weight and bias into our Conv1d.
+Input shape: (1, 12)
+Our output shape: (1, 10)
+Matches torch.nn.Conv1d: True
+```
+
+### Class-Based PyTorch Model
+
+In the previous session we used `nn.Sequential` to create models. It a functional style that provides a really fast way to create deep neural networks, but it takes away the control we have over how data flows from one layer to the next.
+
+<details>
+<summary>What is the main assumption of the functional style model creation in PyTorch?</summary>
+
+It is that the data flows in a linear fashion without intermediate transformations. It is really just a chain of classes that get executed in the particular order.
+
+</details>
+
+To alleviate this, we'll use another syntax to define models: the `class-based` approach.
+
+Here's an example of sequential model definition:
+
+```python
+import torch.nn as nn
+
+net = nn.Sequential(
+  nn.Linear(9, 16),
+  nn.ReLU(),
+  nn.Linear(16, 8),
+  nn.ReLU(),
+  nn.Linear(8, 1),
+  nn.Sigmoid(),
+)
+```
+
+Here's how it can be re-written using the `class-based` approach:
+
+```python
+class Net(nn.Module):
+  def __init__(self):
+    super(Net, self).__init__()
+    self.fc1 = nn.Linear(9, 16)
+    self.fc2 = nn.Linear(16, 8)
+    self.fc3 = nn.Linear(8, 1)
+  
+  def forward(self, x):
+    x = nn.functional.relu(self.fc1(x))
+    x = nn.functional.relu(self.fc2(x))
+    x = nn.functional.sigmoid(self.fc3(x))
+    return x
+
+net = Net()
+```
+
+As can be seen above, every model should define the following two methods:
+
+- `__init__()`: defines the layers that are used in the `forward()` method;
+- `forward()`: defines what happens to the model inputs once it receives them; this is where you pass inputs through pre-defined layers.
+
+By convention `torch.nn.functional` gets imported with an alias `F`. That means that the above body of `forward` can be rewritten like:
+
+```python
+import torch.nn.functional as F
+
+...
+
+x = F.relu(self.fc1(x))
+x = F.relu(self.fc2(x))
+x = F.sigmoid(self.fc3(x))
+```
+
+### Working with images in PyTorch
+
+### The Clouds dataset
+
+We will be working with a dataset containing pictures of various types of clouds.
+
+![w08_task05.png](assets/w08_task05.png "w08_task05.png")
+
+<details>
+
+<summary>How can we load one of those images in Python?</summary>
+
+We can use the [`pillow`](https://pypi.org/project/pillow/) package. It is imported with the name `PIL` and has a very handly [`Image.open` function](https://pillow.readthedocs.io/en/latest/handbook/tutorial.html#using-the-image-class).
+
+</details>
+
+<details>
+
+<summary>Wait - what is an image again?</summary>
+
+- The image is a matrix of pixels ("picture elements").
+- Each pixel contains color information.
+
+![w08_image_pixels.png](assets/w08_image_pixels.png "w08_image_pixels.png")
+
+- Grayscale images: integer in the range $[0 - 255]$.
+  - 30:
+
+    ![w08_image_gray.png](assets/w08_image_gray.png "w08_image_gray.png")
+
+- Color images: three/four integers, one for each color channel (**R**ed, **G**reen, **B**lue, sometimes also **A**lpha).
+  - RGB = $(52, 171, 235)$:
+
+    ![w08_image_blue.png](assets/w08_image_blue.png "w08_image_blue.png")
+
+</details>
+
+### Converting pixels to tensors and tensors to pixels
+
+[`ToTensor()`](https://pytorch.org/vision/main/generated/torchvision.transforms.ToTensor.html#totensor):
+
+- Converts pixels to float tensors (PIL image => `torch.float`).
+- Scales values to $[0.0, 1.0]$.
+
+[`PILToTensor()`](https://pytorch.org/vision/main/generated/torchvision.transforms.PILToTensor#piltotensor):
+
+- Converts pixels to `8`-bit unsigned integers (PIL image => `torch.uint8`).
+- Does not scale values: they stay in the interval $[0, 255]$.
+
+[`ToPILImage()`](https://pytorch.org/vision/0.9/transforms.html#torchvision.transforms.ToPILImage):
+
+- Converts a tensor or an numpy `ndarray` to PIL Image.
+- Does not change values.
+
+### Loading images with PyTorch
+
+The easiest way to build a `Dataset` object when we have a classification task is with a predefined directory structure.
+
+As we load the images, we could also apply preprocessing steps using `torchvision.transforms`.
+
+```text
+clouds_train
+  - cumulus
+    - 75cbf18.jpg
+    - ...
+  - cumulonimbus
+  - ...
+clouds_test
+  - cumulus
+  - cumulonimbus
+```
+
+- Main folders: `clouds_train` and `clouds_test`.
+  - Inside: one folder per category.
+    - Inside: image files.
+
+```python
+from torchvision.datasets import ImageFolder
+from torchvision import transforms
+from torch.utils import data
+
+train_transforms = transforms.Compose([
+  transforms.ToTensor(), # convert the object into a tensor
+  transforms.Resize((128, 128)), # resize the images to be of size 128x128
+])
+
+dataset_train = ImageFolder(
+  'DATA/clouds/clouds_train',
+  transform=train_transforms,
+)
+
+dataloader_train = data.DataLoader(
+  dataset_train,
+  shuffle=True,
+  batch_size=1,
+)
+
+image, label = next(iter(dataloader_train))
+print(image.shape)
+```
+
+```console
+torch.Size([1, 3, 128, 128])
+```
+
+In the above output:
+
+- `1`: batch size;
+- `3`: three color channels;
+- `128`: height;
+- `128`: width.
+
+We could display these images as well, but we'll have to do two transformations:
+
+1. We need to have a three dimensional matrix. The above shape represents a `4D` one. To remove all dimensions with size `1`, we can use the `squeeze` method of the `image` object.
+2. The number of color channels must come after the height and the width. To change the order of the dimensions, we can use the `permute` method of the `image` object.
+
+```python
+image = image.squeeze().permute(1, 2, 0)
+print(image.shape)
+```
+
+```console
+torch.Size([128, 128, 3])
+```
+
+We can now, plot this using `matplotlib`:
+
+```python
+import matplotlib.pyplot as plt
+plt.imshow(image)
+plt.axis('off')
+plt.show()
+```
+
+![w08_loading_image_result.png](assets/w08_loading_image_result.png "w08_loading_image_result.png")
+
+### Data augmentation
+
+<details>
+
+<summary>What is data augmentation?</summary>
+
+Applying random transformations to original data points.
+
+</details>
+
+<details>
+
+<summary>What is the goal of data augmentation?</summary>
+
+Generating more data.
+
+</details>
+
+<details>
+
+<summary>On which set should data augmentation be applied to - train, validation, test, all, some?</summary>
+
+Only to the training set.
+
+</details>
+
+<details>
+
+<summary>What is the added value of data augmentation?</summary>
+
+- Increase the size of the training set.
+- Increase the diversity of the training set.
+- Improve model robustness.
+- Reduce overfitting.
+
+</details>
+
+All supported image augmentation transformation can be found in [the documentation of torchvision](https://pytorch.org/vision/stable/transforms.html#v2-api-reference-recommended).
+
+<details>
+
+<summary>Image augmentation operations can sometimes negatively impact the training process. Can you think of two deep learning tasks in which specific image augmentation operations should not be used?</summary>
+
+- Fruit classification and changing colors:
+
+One of the supported image augmentation transformations is [`ColorJitter`](https://pytorch.org/vision/stable/auto_examples/transforms/plot_transforms_illustrations.html#colorjitter) - it randomly changes brightness, contrast, saturation, hue, and other properties of an image.
+
+If we are doing fruit classification and decide to apply a color shift augmentation to an image of the lemon, the augmented image will still be labeled as lemon although it would represent a lime.
+
+![w08_data_augmentation_problem.png](assets/w08_data_augmentation_problem.png "w08_data_augmentation_problem.png")
+
+- Hand-written characters classification and vertical flip:
+
+![w08_data_augmentation_problem2.png](assets/w08_data_augmentation_problem2.png "w08_data_augmentation_problem2.png")
+
+</details>
+
+<details>
+
+<summary>So, how do we choose appropriate augmentation operations?</summary>
+
+- Whether an augmentation operation is appropriate depends on the task and data.
+- Remember: Augmentations impact model performance.
+
+<details>
+
+<summary>Ok, but then how do we see the dependence in terms of data?</summary>
+
+Explore, explore, explore!
+
+</details>
+
+</details>
+
+<details>
+
+<summary>What transformations can you think of for our current task (cloud classification)?</summary>
+
+```python
+train_transforms = transforms.Compose([
+  transforms.RandomHorizontalFlip(), # simulate different viewpoints of the sky
+  transforms.RandomRotation(45), # expose model to different angles of cloud formations
+  transforms.RandomAutocontrast(), # simulate different lighting conditions
+  transforms.ToTensor(), # convert the object into a tensor
+  transforms.Resize((128, 128)), # resize the images to be of size 128x128
+])
+```
+
+![w08_data_augmentation.png](assets/w08_data_augmentation.png "w08_data_augmentation.png")
+
+</details>
+
+Which of the following statements correctly describe data augmentation? (multiple selection)
+
+```text
+A. Using data augmentation allows the model to learn from more examples.
+B. Using data augmentation increases the diversity of the training data.
+C. Data augmentation makes the model more robust to variations and distortions commonly found in real-world images.
+D. Data augmentation reduces the risk of overfitting as the model learns to ignore the random transformations.
+E. Data augmentation introduces new information to the model that is not present in the original dataset, improving its learning capability.
+F. None of the above.
+```
+
+<details>
+
+<summary>Reveal answer</summary>
+
+Answers: A, B, C, D.
+
+Data augmentation allows the model to learn from more examples of larger diversity, making it robust to real-world distortions.
+
+It tends to improve the model's performance, but it does not create more information than is already contained in the original images.
+
+<details>
+
+<summary>What should we prefer - using more real training data or generating it artificially?</summary>
+
+If available, using more training data is preferred to creating it artificially with data augmentation.
+
+</details>
+
+</details>
+
+You are building a model to recognize different flower species. You consider three augmentations to use: `color shift`, `rotation`, and `texture change`. The graphic below shows the examples of these three augmentations. Which of the augmentations could be used for the flower classifier?
+
+![w08_checkpoint.png](assets/w08_checkpoint.png "w08_checkpoint.png")
+
+```text
+A. Only color shift
+B. Only rotation
+C. Only texture shift
+D. All three
+E. None of the three
+```
+
+<details>
+
+<summary>Reveal answer</summary>
+
+Answer: B.
+
+The flower is still the same species when it's rotated, so this augmentation will not introduce noise in training labels; rather, it will increase the diversity of the training samples.
+
+For this task having the right color is important. The other two operations can change the color which could negatively impact the performance of the model.
+
+</details>
+
+### Convolutional Neural Networks
+
+Let's say that we have the following image:
+
+![w08_linear_layers_problem.png](assets/w08_linear_layers_problem.png "w08_linear_layers_problem.png")
+
+<details>
+
+<summary>What is the problem of using linear layers to solve the classification task?</summary>
+
+Too many parameters.
+
+If the input size is `256x256`, that means that the network has `65,536` inputs!
+
+If the first linear layer has `1000` neurons, only it alone would result in over `65` **million** parameters! For a color image, this number would be even higher.
+
+![w08_linear_layers_problem2.png](assets/w08_linear_layers_problem2.png "w08_linear_layers_problem2.png")
+
+So, the three main problems are:
+
+- Incredible amount of resources needed.
+- Slow training.
+- Overfitting.
+
+</details>
+
+<details>
+
+<summary>What is another more subtle problem of using linear layers only?</summary>
+
+They are not space-invariant.
+
+Linearly connected neurons could learn to detect the cat, but the same cat **won't be recognized if it appears in a *different* location**.
+
+![w08_space_invariance.png](assets/w08_space_invariance.png "w08_space_invariance.png")
+
+</details>
+
+<details>
+
+<summary>So, ok - the alternative is using CNNs. How do they work?</summary>
+
+![w08_cnn.png](assets/w08_cnn.png "w08_cnn.png")
+
+- Parameters are collected in one or more small grids called **filters**.
+- **Slide** filter(s) over the input.
+- At each step, perform the **convolution** operation.
+  - We'll show what this means shortly.
+- The end result (after the whole image has been traversed with **one filter**) is called a **feature map**:
+  - Preserves spatial patterns from the input.
+  - Uses fewer parameters than linear layer.
+- Remember: one filter = one feature map. We can slide **multiple filters over an original image**, to get multiple feature maps.
+- We can then apply activations to the feature maps.
+- The set of all feature maps combined, form the output of a single convolutional layer.
+- Available in `torch.nn`: [`nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3)`](https://pytorch.org/docs/stable/generated/torch.nn.Conv2d.html):
+  - `in_channels`: number of input dimensions.
+  - `out_channels`: number of filters.
+  - `kernel_size`: height and width of the filter(s).
+
+</details>
+
+<details>
+
+<summary>What does the convolution operation comprise of?</summary>
+
+![w08_cnn_dot.png](assets/w08_cnn_dot.png "w08_cnn_dot.png")
+
+</details>
+
+<details>
+
+<summary>What is zero padding? What added value does it have?</summary>
+
+![w08_cnn_zero_pad.png](assets/w08_cnn_zero_pad.png "w08_cnn_zero_pad.png")
+
+- Add a frame of zeros to the input of the convolutional layer.
+- This maintains the spatial dimensions of the input and output tensors.
+- Ensures border pixels are treated equally to others.
+
+Available as `padding` argument: `nn.Conv2d(3, 32, kernel_size=3, padding=1)`.
+
+</details>
+
+<details>
+
+<summary>What is max pooling? What added value does it have?</summary>
+
+![w08_cnn_max_pool.png](assets/w08_cnn_max_pool.png "w08_cnn_max_pool.png")
+
+- Slide non-overlapping window over input.
+- At each position, retain only the maximum value.
+  - This is analogous to our brain: we remember things for which our neurons produce a high electrical signal.
+- Used after convolutional layers to reduce spatial dimensions.
+
+Available in `torch.nn`: [`nn.MaxPool2d(kernel_size=2)`](https://pytorch.org/docs/stable/generated/torch.nn.MaxPool2d.html).
+
+</details>
+
+<details>
+
+<summary>But what happens when the input is three dimensional - what do the filters look like?</summary>
+
+The `2D` part of a `2D` convolution does not refer to the dimension of the convolution input, nor of dimension of the filter itself, but rather of the space in which the filter is allowed to move (`2` directions only).
+
+Different `2D`-array filters are applied to each dimension and then their outputs are summed up (you can also think of this as a single `3D` matrix):
+
+![w08_rgb_convolution.png](assets/w08_rgb_convolution.png "w08_rgb_convolution.png")
+
+$$(1*1+2*2+4*3+5*4)+(0*0+1*1+3*2+4*3) = 56$$
+
+More on this [here](https://stackoverflow.com/a/62544803/16956119) and [here](https://d2l.ai/chapter_convolutional-neural-networks/channels.html).
+
+</details>
+
+### Visualizing the weights
+
+Let's compare the visual interpretation of a `Linear` layer to that of a 2D convolution `nn.Conv2d`.
+
+<details>
+
+<summary>What are the one main characteristic of linear layers?</summary>
+
+Every input connects to every neuron via a weight.
+
+</details>
+
+<details>
+
+<summary>Do the weights get shared across neurons - for example, can neuron X use the same weight that neuron Y used?</summary>
+
+No. Each weight is tied to a neuron and is independent from every other weight.
+
+</details>
+
+<details>
+
+<summary>What architecture would we get if we drew a single linear layer with nine inputs and four outputs?</summary>
+
+![w08_drawing_linear.png](./assets/w08_drawing_linear.png "w08_drawing_linear.png")
+
+</details>
+
+Ok - great! Let's compare this to a CNN.
+
+<details>
+
+<summary>What are two aspects in which the connections in a convolutional layer differ from those in a linear layer?</summary>
+
+- Every input connects only to the neurons that "see it", i.e. that have it in their receptive field.
+- Arrows/weights form kernels. Weights in a single kernel **are shared for every output neuron**.
+
+</details>
+
+<details>
+
+<summary>What architecture would we get if we drew a single convolutional layer with one input channel and two output channels?</summary>
+
+![w08_drawing_cnn.png](./assets/w08_drawing_cnn.png "w08_drawing_cnn.png")
+
+Take a moment to ensure you truly understand how the weights are connected and shared in a single kernel.
+
+</details>
+
+### Convolutions in different dimensions
+
+So far, we've been discussing the class [`nn.Conv2d`](https://docs.pytorch.org/docs/stable/generated/torch.nn.Conv2d.html). There are two more ways we can apply convolutions in PyTorch - [`nn.Conv1d`](https://docs.pytorch.org/docs/stable/generated/torch.nn.Conv1d.html) and [`nn.Conv3d`](https://docs.pytorch.org/docs/stable/generated/torch.nn.Conv3d.html). Let's see how they'd work.
+
+If in 2D convolutions, we have as input:
+
+![w08_2d_input.png](./assets/w08_2d_input.png "w08_2d_input.png")
+
+<details>
+
+<summary>How would a 2D convolution with two output channels look like?</summary>
+
+![w08_2d_input_conv.png](./assets/w08_2d_input_conv.png "w08_2d_input_conv.png")
+
+</details>
+
+<details>
+
+<summary>How many dimensions does the output of a single kernel have?</summary>
+
+The output of each kernel is a 2D tensor.
+
+</details>
+
+<details>
+
+<summary>So many dimensions does the output of a single 2D convolutional layer have?</summary>
+
+The output of a layer is a 3D tensor because the multiple kernels form a new channel/depth axis.
+
+</details>
+
+<details>
+
+<summary>How would the feature map look in our case?</summary>
+
+![w08_2d_input_conv_out.png](./assets/w08_2d_input_conv_out.png "w08_2d_input_conv_out.png")
+
+</details>
+
+Ok - perfect! We also showed how we can apply a 2D convolution to a 3D input.
+
+Can you draw how the first iteration of the first kernel would compute on the following image?
+
+![w08_3d_input.png](./assets/w08_3d_input.png "w08_3d_input.png")
+
+<details>
+
+<summary>Reveal answer</summary>
+
+Note that here a single kernel spans all of the channels.
+
+![w08_3d_input_conv.png](./assets/w08_3d_input_conv.png "w08_3d_input_conv.png")
+
+</details>
+
+Great! Let's now think about how a 3D convolution would look like for the above input.
+
+<details>
+
+<summary>Can you intuit what the drawing would look like?</summary>
+
+It is a bit harder to visualize, but the main difference is that now the kernels do not span the full channel axis. Instead, the number of channels they span is a property (i.e. user-configurable) of the kernels:
+
+![w08_3d_input_3d_conv.png](./assets/w08_3d_input_3d_conv.png "w08_3d_input_3d_conv.png")
+
+Arguably a clearer vitalization is the following:
+
+![w08_3d_input_3d_conv2.png](./assets/w08_3d_input_3d_conv2.png "w08_3d_input_3d_conv2.png")
+
+and the following:
+
+![w08_3d_input_3d_conv3.png](./assets/w08_3d_input_3d_conv3.png "w08_3d_input_3d_conv3.png")
+
+</details>
+
+So what about 1D convolutions?
+
+<details>
+
+<summary>How would an example of a 1D convolution look like?</summary>
+
+When the input is one dimensional (i.e. has one row), we just move across this row:
+
+![w08_1d_ex.png](./assets/w08_1d_ex.png "w08_1d_ex.png")
+
+</details>
+
+And just like we were able to apply 2D convolutions on 3D input, we can also apply 1D convolutions to 2D input.
+
+<details>
+
+<summary>How would an example of a 1D convolution look like on 2D input?</summary>
+
+We'll treat the height as channels. A single kernel would encompass the full height and slide along the width.
+
+![w08_1d_ex2.png](./assets/w08_1d_ex2.png "w08_1d_ex2.png")
+
+</details>
+
+A great website to view the logic behind padding, stride and groups for 2D convolutions is available in [animatedai's github page](https://animatedai.github.io/).
+
+#### Task 02
+
+**Description:**
+
+We did the core operation on a single channel; real inputs arrive batched and with multiple channels.
+
+Extend `Conv1d.forward` to accept a batched, multi-channel input shaped `(batch, in_channels, length)` and a weight shaped `(out_channels, in_channels, kernel_size)`. The sliding part of the computation is still a visible loop - over the batch, over each output channel, over each output position - but the window-times-kernel-and-sum that spelled out one tap at a time becomes a dot product rather than a further manual loop.
+
+Create a script that copies a real `torch.nn.Conv1d(in_channels=3, out_channels=4, kernel_size=5)`'s weight and bias into our `Conv1d`, runs both on the same `(2, 3, 20)` batch, and prints whether the two outputs match.
+
+**Acceptance criteria:**
+
+- Multiple inputs can be handled by the convolution operation.
+- Inputs with multiple channels can be handled by the convolution operation.
+
+**Test cases:** See `tests/test_dl_lib/test_vision/test_conv.py`:
+
+- `TestConv1dForward.test_when_input_is_batched_then_output_keeps_the_batch_dimension`;
+- `TestConv1dForward.test_when_multiple_channels_and_batched_then_matches_torch_nn_conv1d`.
+
+**Example output:**
+
+```bash
+python run.py -w 8 -t 2
+```
+
+```text
+Copied torch.nn.Conv1d's weight and bias into our Conv1d.
+Input shape: (2, 3, 20)
+Our output shape: (2, 4, 16)
+Matches torch.nn.Conv1d: True
+```
+
+#### Task 03
+
+**Description:**
+
+Extend `Conv1d.forward` to pad the input with `padding` zeros on each side, then walk output positions `stride` apart instead of one at a time.
+
+Create a script that runs three configurations - no padding with stride 2, padding with stride 1, and both together - against `torch.nn.Conv1d`, printing each configuration's hand-computed output length next to the length the layer actually reports, and whether the outputs match.
+
+**Acceptance criteria:**
+
+- Padding is supported.
+- Stride is supported.
+
+**Test cases:** See `tests/test_dl_lib/test_vision/test_conv.py`:
+
+- `TestConv1dForward.test_when_stride_and_padding_given_then_output_length_matches_the_formula`;
+- `TestConv1dForward.test_when_stride_given_then_matches_torch_nn_conv1d`;
+- `TestConv1dForward.test_when_padding_given_then_matches_torch_nn_conv1d`;
+- `TestConv1dForward.test_when_stride_and_padding_both_given_then_matches_torch_nn_conv1d`.
+
+**Example output:**
+
+```bash
+python run.py -w 8 -t 3
+```
+
+```text
+Config: {'kernel_size': 3, 'stride': 2, 'padding': 0}
+  Computed output length: 8, reported: 8
+  Matches torch.nn.Conv1d: True
+Config: {'kernel_size': 3, 'stride': 1, 'padding': 2}
+  Computed output length: 19, reported: 19
+  Matches torch.nn.Conv1d: True
+Config: {'kernel_size': 4, 'stride': 3, 'padding': 2}
+  Computed output length: 6, reported: 6
+  Matches torch.nn.Conv1d: True
+```
+
+#### Task 04
+
+**Description:**
+
+Define the `Conv2d` class following the same recipe as `Conv1d`. It provides:
+
+- `construction`: takes a square `kernel_size`, `stride`, and `padding`. It creates a `weight` tensor shaped `(out_channels, in_channels, kernel_size, kernel_size)` and a `bias` tensor.
+- `forward`: accepts a batched or an unbatched input, and pads, strides, and slides over both spatial axes the way `Conv1d` slides over its one axis.
+
+Create a script that runs three configurations against `torch.nn.Conv2d` on a `(2, in_channels, 64, 64)` batch and prints each configuration's output shape and whether it matches.
+
+**Acceptance criteria:**
+
+- Two dimensional convolutions are supported.
+
+**Test cases:** See `tests/test_dl_lib/test_vision/test_conv.py`:
+
+- `TestConv2dInit`;
+- `TestConv2dForward`;
+- `TestConv2dParameters`.
+
+**Example output:**
+
+```bash
+python run.py -w 8 -t 4
+```
+
+```text
+Config: {'in_channels': 3, 'out_channels': 4, 'kernel_size': 3, 'stride': 1, 'padding': 0}
+  Output shape: (2, 4, 62, 62)
+  Matches torch.nn.Conv2d: True
+Config: {'in_channels': 3, 'out_channels': 4, 'kernel_size': 5, 'stride': 2, 'padding': 2}
+  Output shape: (2, 4, 32, 32)
+  Matches torch.nn.Conv2d: True
+Config: {'in_channels': 3, 'out_channels': 96, 'kernel_size': 11, 'stride': 4, 'padding': 2}
+  Output shape: (2, 96, 15, 15)
+  Matches torch.nn.Conv2d: True
+The last config is AlexNet's real conv1: in_channels=3, out_channels=96, kernel_size=11, stride=4, padding=2.
+```
+
+#### Task 05
+
+**Description:**
+
+Let's do a performance analysis.
+
+Create a script that builds our `Conv2d` and a reference `torch.nn.Conv2d`, both configured exactly like AlexNet's conv1 (`in_channels=3, out_channels=96, kernel_size=11, stride=4, padding=2`), runs each once untimed as a warm-up, then times one more call to each on a `(4, 3, 64, 64)` batch, printing both times, the speedup, and whether the outputs match.
+
+**Acceptance criteria:**
+
+- Our implementation is compared to the PyTorch implementation.
+
+**Example output:**
+
+```bash
+python run.py -w 8 -t 5
+```
+
+```text
+Input shape: (4, 3, 64, 64)
+Our Conv2d: 0.7160s
+torch.nn.Conv2d: 0.0003s
+Speedup: 2684.7x
+Matches torch.nn.Conv2d: True
+```
+
+<details>
+<summary>What does max pool do with the padding?</summary>
+
+A zero pad would win the max whenever every real value in that window happens to be negative.
+
+Negative infinity can never be the largest value in a window that contains at least one real pixel, so it behaves like "not here" rather than "zero signal".
+
+</details>
+
+#### Task 06
+
+**Description:**
+
+Define the `MaxPool2d` class. It provides:
+
+- `construction`: takes `kernel_size`, an optional `stride` (defaults to `kernel_size`), and an optional `padding` (defaults to `0`).
+- `forward`: accepts either an unbatched or a batched input and does the pooling.
+
+Create a script that runs three configurations against `torch.nn.MaxPool2d` on a `(2, 96, 15, 15)` batch - AlexNet's own `features` activation shape after conv1 - the last configuration being AlexNet's exact pool config (`kernel_size=3, stride=2`), printing each configuration's output shape and whether it matches.
+
+**Acceptance criteria:**
+
+- Max pooling is implemented.
+
+**Test cases:** See `tests/test_dl_lib/test_vision/test_pooling.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 8 -t 6
+```
+
+```text
+Config: {'kernel_size': 2, 'stride': 2, 'padding': 0}
+  Output shape: (2, 96, 7, 7)
+  Matches torch.nn.MaxPool2d: True
+Config: {'kernel_size': 3, 'stride': 1, 'padding': 1}
+  Output shape: (2, 96, 15, 15)
+  Matches torch.nn.MaxPool2d: True
+Config: {'kernel_size': 3, 'stride': 2, 'padding': 0}
+  Output shape: (2, 96, 7, 7)
+  Matches torch.nn.MaxPool2d: True
+The last config is AlexNet's real pool1/pool2/pool5: kernel_size=3, stride=2.
+```
+
+#### Task 07
+
+**Description:**
+
+Define the `Linear` class in `dl_lib.nn.linear`. It provides:
+
+- `construction`: takes `in_features` and `out_features`, creates a `weight` tensor shaped `(out_features, in_features)` and a `bias` tensor.
+- `forward`: computes the forward pass, handling both an unbatched and a batched input.
+- `to`: takes a `device` and moves `weight` and `bias` onto it, re-wrapping each as a leaf tensor with `requires_grad=True`, then returns the layer itself.
+
+Create a script that, for three configurations matching AlexNet's real classifier shapes (256->1024, 1024->1024, 1024->10), copies a reference `torch.nn.Linear`'s weight and bias into ours and prints whether the outputs match, then times one more call to each on the first configuration and prints both times and the speedup.
+
+**Acceptance criteria:**
+
+- A fully connected layer is implemented.
+
+**Test cases:** See `tests/test_dl_lib/test_nn/test_linear.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 8 -t 7
+```
+
+```text
+Config: in_features=256, out_features=1024
+  Output shape: (4, 1024)
+  Matches torch.nn.Linear: True
+Config: in_features=1024, out_features=1024
+  Output shape: (4, 1024)
+  Matches torch.nn.Linear: True
+Config: in_features=1024, out_features=10
+  Output shape: (4, 10)
+  Matches torch.nn.Linear: True
+These three shapes are AlexNet's real classifier: 256->1024, 1024->1024, 1024->10.
+Timing on in_features=256, out_features=1024:
+Our Linear: 0.0000s
+torch.nn.Linear: 0.0001s
+Speedup: 0.48x
+Matches torch.nn.Linear: True
+```
+
+<details>
+<summary>AlexNet's first layer uses an 11x11 kernel with stride 4, much larger than any later layer - why start so large?</summary>
+
+The input is large (227x227 in the paper, 64x64 here) and a large kernel with a large stride gives the first layer a wide receptive field while aggressively downsampling the spatial size in a single step, which keeps the next layer's input - and its memory footprint - manageable. The paper's own authors cite GPU memory as part of this choice: in 2012, a large first-layer stride was also what made the network fit in the memory of a single consumer GPU at all.
+
+</details>
+
+Here is the architecture we'll build now:
+
+| Layer | Type | Kernel | Stride | Pad | Out channels | Output shape |
+|---|---|---|---|---|---|---|
+| conv1 | Conv2d | 11x11 | 4 | 2 | 96 | 15x15x96 |
+| pool1 | MaxPool2d | 3x3 | 2 | 0 | - | 7x7x96 |
+| conv2 | Conv2d | 5x5 | 1 | 2 | 256 | 7x7x256 |
+| pool2 | MaxPool2d | 3x3 | 2 | 0 | - | 3x3x256 |
+| conv3 | Conv2d | 3x3 | 1 | 1 | 384 | 3x3x384 |
+| conv4 | Conv2d | 3x3 | 1 | 1 | 384 | 3x3x384 |
+| conv5 | Conv2d | 3x3 | 1 | 1 | 256 | 3x3x256 |
+| pool5 | MaxPool2d | 3x3 | 2 | 0 | - | 1x1x256 |
+| flatten | Flatten | - | - | - | - | 256 |
+| fc1 | Linear+ReLU+Dropout(0.5) | - | - | - | 1024 | 1024 |
+| fc2 | Linear+ReLU+Dropout(0.5) | - | - | - | 1024 | 1024 |
+| fc3 | Linear | - | - | - | 10 | 10 |
+
+Let's define the feature extraction part first.
+
+#### Task 08
+
+**Description:**
+
+Define the class `AlexNet`:
+
+- `construction`: takes `in_channels` (defaulting to `3`) and builds a `features` extractor: a `dl_lib.nn.Sequential` of five `torch.nn.Conv2d` layers each followed by `torch.nn.ReLU`, with a `torch.nn.MaxPool2d` after the first, second, and fifth convolution. Use the per-layer table above for each conv's `kernel_size`, `stride`, `padding`, and `out_channels`.
+
+Create a script that constructs `AlexNet(in_channels=3)`, runs a batch of random noise shaped `(4, 3, 64, 64)` through `model.features`, and prints the input shape and the resulting output shape.
+
+**Acceptance criteria:**
+
+- The convolutional part of the AlexNet architecture is defined.
+
+**Test cases:** See `tests/test_dl_lib/test_vision/test_alexnet.py`: `TestInit`.
+
+**Example output:**
+
+```bash
+python run.py -w 8 -t 8
+```
+
+```text
+Input shape: (4, 3, 64, 64)
+features(x) output shape: (4, 256, 1, 1)
+```
+
+<details>
+<summary>The paper applies Local Response Normalization after the first two conv+ReLU blocks and splits channels across two GPUs - why does this implementation do neither?</summary>
+
+Local Response Normalization was the paper's 2012-era answer to stabilizing activations across nearby channels; Week 07 already taught `BatchNorm1d` and `LayerNorm`, the normalization techniques that superseded it, so we name LRN, say where the paper used it, and deliberately leave it out rather than silently dropping it. The two-GPU split existed only because a single 2012 GPU could not fit the whole network's memory footprint - a hardware constraint of its time, not a modelling decision, so there is nothing to reproduce.
+
+</details>
+
+Ok - let's now finish off with the classifier on top.
+
+#### Task 09
+
+**Description:**
+
+Extend `AlexNet`:
+
+- `construction`: also takes `num_classes` (defaulting to `10`) and builds a `classifier`: a `dl_lib.nn.Sequential` of `torch.nn.Flatten`, then two `(torch.nn.Linear, torch.nn.ReLU, torch.nn.Dropout(0.5))` blocks of `1024` units each, then a final `torch.nn.Linear` down to `num_classes`.
+- `forward`: does the forward pass.
+- `parameters`: returns all parameters.
+- `train` / `eval`: propagate the mode change into the sub-networks.
+- `to`: takes a `device` and moves every child held inside `features` and `classifier` onto it, then returns the model itself. Neither `features` nor `classifier` is a `torch.nn.Module` - both are our own `dl_lib.nn.Sequential`, which doesn't inherit `torch.nn`'s recursive `.to()` - so the loop calls `.to(device)` directly on each child layer it holds, the same duck typing that already lets `Sequential` treat any child uniformly.
+
+Create a script that constructs `AlexNet()`, runs the same batch of random noise through it twice in `.train()` mode and twice in `.eval()` mode, and prints both logits' shapes plus whether the two passes are identical in each mode.
+
+**Acceptance criteria:**
+
+- Training for a few steps on a small fixed batch lowers the loss.
+
+**Test cases:** See `tests/test_dl_lib/test_vision/test_alexnet.py`:
+
+- `TestTo`;
+- `TestForward`;
+- `TestTrain`;
+- `TestEval`;
+- `TestParameters`.
+
+**Example output:**
+
+```bash
+python run.py -w 8 -t 9
+```
+
+```text
+Train mode: first logits (2, 10), second logits (2, 10)
+Train mode: two forward passes identical? False
+Eval mode:  first logits (2, 10), second logits (2, 10)
+Eval mode:  two forward passes identical? True
+```
+
+### The Model Report File
+
+Whenever we're building a model, we're going to have to produce the so-called **Model report**. This is an Excel file, but serves as the basis of our work and tells the story of our journey. It is typically **presented to your clients** and shows what has been tried out, what worked, what didn't and, ultimately, which is the best model for the task.
+
+Here're the guidelines we'll follow:
+
+1. Each row is a hypothesis - a model that was trained and evaluated.
+2. The columns are divided into two sets: the first set of columns represent the values of the hyperparameters of the model, the second set: the metrics on the **test** set. Do not use more than `3` metrics.
+3. The first row holds the so-called **baseline model**. This model can be only one of two things: if currently there is a deployed model on the client's environment, then it is taken to be the baseline model. Otherwise the baseline model is the greediest statistical model. For example, this is the model that predicts the most common class in classification problems.
+4. The columns that show the metrics express both the value of the metric as well as the percentage of change **compared to the *baseline* model** (we're striving for percentage increase, but should report every case).
+5. The rightmost column should be titled `Comments` and should hold our interpretation of the model (what do we see as metrics, is it good, is it bad, etc). We may include the so-called `Error Analysis` which details where this model makes mistakes.
+6. Above or below the main table there should be a cell that **explicitly** states which is the best model and why.
+7. Below the table or in other sheets there should be the following diagrams: `train vs validation metric` (the main metric used) and if the model outputs a loss, we should have a `train vs validation loss` diagram.
+8. The table should not be a pandas export - it should be coloured and tell the story of modelling. Bold and/or highlight the entries in which the metric is highest or to which you want to draw attention to.
+9. Do not sort the table after completing the experiments - it should be in the order of the created models. This lets you build up on the section `Comments` and easily track the changes made.
+10. Do not create a very wide table - it **should be easy to understand which is the best model** in one to two seconds of looking at it. Focus on the user experience.
+11. Optionally, you could create an additional sheet for the best model in which you put 4-5 examples of correct and incorrect predictions. This will control the client's expectations.
+
+> **Tip**: Since we're talking about doing a lot of experiments (typically `50` - `200`), you'll find it tedious to use Jupyter notebooks. Instead, create **scripts** and run them **in parallel**. This will speed up modelling speed tremendously!
+
+The end result is a table that is present in most scientific papers. Here are some examples:
+
+- [EXAMS-V: A Multi-Discipline Multilingual Multimodal Exam Benchmark for Evaluating Vision Language Models](https://arxiv.org/pdf/2403.10378)
+
+![w08_ex_table1.png](./assets/w08_ex_table1.png "w08_ex_table1.png")
+
+- [ImageNet Classification with Deep Convolutional Neural Networks](https://proceedings.neurips.cc/paper_files/paper/2012/file/c399862d3b9d6b76c8436e924a68c45b-Paper.pdf)
+
+![w08_imagenet_results_table.png](./assets/w08_imagenet_results_table.png "w08_imagenet_results_table.png")
+
+- [BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding](https://arxiv.org/pdf/1810.04805)
+
+![w08_ex_table3.png](./assets/w08_ex_table3.png "w08_ex_table3.png")
+
+### Precision & Recall for Multiclass Classification (revisited)
+
+#### Computing total value
+
+In the previous session we introduced the metrics `precision` and `recall` in the context of binary classification. We also touched very slightly on the usecase for multiclass classification - let's elaborate more on how we can interpret the metrics.
+
+Let's say we get the following table:
+
+```console
+              precision    recall  f1-score   support
+
+     class 0       0.50      1.00      0.67         1
+     class 1       0.00      0.00      0.00         1
+     class 2       1.00      0.67      0.80         3
+
+    accuracy                           0.60         5
+   macro avg       0.50      0.56      0.49         5
+weighted avg       0.70      0.60      0.61         5
+```
+
+`Support` represents the number of instances for each class within the true labels. If the column with `support` has different numbers, then we have class imbalance.
+
+- `macro average` = $\frac{F1_{class1} + F1_{class2} + F1_{class3}}{3}$
+- `weighted average` = $\frac{F1_{class1}*SUPPORT_{class1} + F1_{class2}*SUPPORT_{class2} + F1_{class3}*SUPPORT_{class3}}{3}$
+- `micro average` = $\frac{F1_{class1}*SUPPORT_{class1} + F1_{class2}*SUPPORT_{class2} + F1_{class3}*SUPPORT_{class3}}{SUPPORT_{class1} + SUPPORT_{class2} + SUPPORT_{class3}}$
+
+To calculate them with `torch`, we can use the classes [`torchmetrics.Recall`](https://lightning.ai/docs/torchmetrics/stable/classification/recall.html) and [`torchmetrics.Precision`](https://lightning.ai/docs/torchmetrics/stable/classification/precision.html):
+
+```python
+from torchmetrics import Recall
+
+recall_per_class = Recall(task='multiclass', num_classes=7, average=None)
+recall_micro = Recall(task='multiclass', num_classes=7, average='micro')
+recall_macro = Recall(task='multiclass', num_classes=7, average='macro')
+recall_weighted = Recall(task='multiclass', num_classes=7, average='weighted')
+```
+
+When to use each:
+
+- `micro`: imbalanced datasets.
+- `macro`: consider errors in small classes as equally important as those in larger classes.
+- `weighted`: consider errors in larger classes as most important.
+
+We also have the [F1 score metric](https://lightning.ai/docs/torchmetrics/stable/classification/f1_score.html). **Remember that it is always best to use the *F1 score* instead of accuracy to handle class imbalances!**
+
+<details>
+
+<summary>What does multilabel classification mean?</summary>
+
+When one instance can get multiple classes assigned to it. This is the case, for example, in research article authorship identification: one article has multiple authors.
+
+</details>
+
+<details>
+
+<summary>Can you give an example for multilabel classification?</summary>
+
+- For example, in research article authorship identification: one article has multiple authors.
+- We also saw examples above with the character and alphabet classification.
+
+</details>
+
+#### Computing per class value
+
+- We can also analyze the performance per class.
+- To do this, compute the metric, setting `average=None`.
+  - This gives one score per each class:
+
+```python
+print(f1)
+```
+
+```console
+tensor([0.6364, 1.0000, 0.9091, 0.7917,
+        0.5049, 0.9500, 0.5493],
+        dtype=torch.float32)
+```
+
+- Then, use the `Dataset`'s `.class_to_idx` attribute that maps class names to indices.
+
+```python
+dataset_test.class_to_idx
+```
+
+```console
+{'cirriform clouds': 0,
+ 'clear sky': 1,
+ 'cumulonimbus clouds': 2,
+ 'cumulus clouds': 3,
+ 'high cumuliform clouds': 4,
+ 'stratiform clouds': 5,
+ 'stratocumulus clouds': 6}
+```
+
+### FashionMNIST
+
+#### Task 10
+
+**Description:**
+
+Define `load_fashion_mnist_loaders`: it takes a `batch_size` and downloads `torchvision.datasets.FashionMNIST`'s train and test splits to `DATA/fashion_mnist/` if not already present, resizes every image to 64x64 (AlexNet's expected spatial size), and returns a train `DataLoader`, a test `DataLoader`, and the list of the 10 class names.
+
+Create a script that loads one batch of images and plots the first 8.
+
+See `cheat_sheet.md`'s Week 08 `torchvision` section for `torchvision.datasets.FashionMNIST` and the `torchvision.transforms.v2` pipeline (`Compose`, `ToImage`, `ToDtype`, `Resize`) used here.
+
+**Acceptance criteria:**
+
+- The first 8 examples of FashionMNIST are shown.
+
+**Test cases:** See `tests/test_dl_lib/test_vision/test_functional.py`.
+
+**Example output:**
+
+```bash
+python run.py -w 8 -t 10
+```
+
+![AlexNet task10 FashionMNIST samples](assets/w08_task10_samples.png)
+
+#### Task 11
+
+**Description:**
+
+Train a model report that compares our own from-scratch `AlexNet`, and `torchvision.models.alexnet`, then keep improving it in your own time.
+
+Create a model report file in which you do at least one experiment with the model from task 9 and several experiments with the built-in implementation while attempting to create the best model/architecture for this dataset.
+
+See `cheat_sheet.md`'s Week 08 `torchvision` section for `torchvision.models.alexnet`.
+
+**Acceptance criteria:**
+
+- A model report file is created.
+
+### CIFAR-10
+
+[CIFAR-10](https://www.cs.toronto.edu/~kriz/cifar.html) is a second, harder image dataset: 60,000 32x32 RGB photos (50,000 train / 10,000 test) split evenly across 10 real-world classes (`airplane`, `automobile`, `bird`, `cat`, `deer`, `dog`, `frog`, `horse`, `ship`, `truck`). Unlike FashionMNIST it is already 3-channel, so no channel-repeating trick is needed to feed it into `AlexNet`.
+
+This is also where we introduce a proper **three-way train/validation/test split**. So far we've only used train/test. From here on: pick the best model/configuration using **validation**, and touch **test** only once, at the very end, to report a final, honest, never-tuned-against score.
+
+#### Task 12
+
+**Description:**
+
+Define `load_cifar10_loaders`: it takes a `batch_size`, downloads `torchvision.datasets.CIFAR10`'s train and test splits to `DATA/cifar10/` if not already present, resizes every image to 64x64, splits the official test data into an equal-sized val and test set (so you end up with train/val/test, not just train/test), and returns a train `DataLoader`, a val `DataLoader`, a test `DataLoader`, and the list of the 10 class names.
+
+Create a script that loads one batch of images and plots the first 8.
+
+See `cheat_sheet.md`'s Week 08 `torchvision` section for `torchvision.datasets.CIFAR10` and the `torchvision.transforms.v2` pipeline (`Compose`, `ToImage`, `ToDtype`, `Resize`) used here.
+
+**Acceptance criteria:**
+
+- The first 8 examples of CIFAR-10 are shown.
+- Images are loaded via a three-way train/val/test split, not a two-way train/test split.
+
+**Test cases:** See `tests/test_dl_lib/test_vision/test_functional.py`.
+
+#### Task 13
+
+**Description:**
+
+Train a model report that compares our own from-scratch `AlexNet`, and `torchvision.models.alexnet`, then keep improving it in your own time.
+
+Create a model report file in which you do at least one experiment with the model from task 9 and several experiments with the built-in implementation while attempting to create the best model/architecture for this dataset. Pick the best model/configuration using the validation set, and touch the test set only once, at the very end, to report its final score - this is why `load_cifar10_loaders` gives you three loaders instead of two.
+
+See `cheat_sheet.md`'s Week 08 `torchvision` section for `torchvision.models.alexnet`.
+
+**Acceptance criteria:**
+
+- A model report file is created.
+- The report's comparison table is scored on the validation set, and the chosen best model's test-set score is reported separately.
+
+### Clouds
+
+The [Clouds dataset](https://www.kaggle.com/datasets/mikolajbabula/clouds-dataset) is a third, smaller, **imbalanced** image dataset: ~474 train / ~486 test JPEG photos of clouds, spread unevenly across 7 classes (`cirriform clouds`, `clear sky`, `cumulonimbus clouds`, `cumulus clouds`, `high cumuliform clouds`, `stratiform clouds`, `stratocumulus clouds`) - from as few as 14 training images (`cumulonimbus clouds`) to as many as 133 (`high cumuliform clouds`).
+
+Unlike FashionMNIST and CIFAR-10, it is **not auto-downloaded** by `torchvision`: it is a directory of raw JPEGs, one subfolder per class, meant to be loaded with `torchvision.datasets.ImageFolder` rather than a built-in `torchvision.datasets` class. Download it and place it at `DATA/clouds/clouds_train/<class name>/*.jpg` and `DATA/clouds/clouds_test/<class name>/*.jpg` before running the tasks below.
+
+Because the classes are so imbalanced, accuracy is a misleading metric here (a model that only ever predicts `high cumuliform clouds` would already score decently) - prefer a macro-averaged metric, same as the rest of this week's model reports.
+
+#### Task 14
+
+**Description:**
+
+Define `load_clouds_loaders`: it takes a `batch_size`, loads the Clouds dataset from `DATA/clouds/clouds_train` and `DATA/clouds/clouds_test` with `torchvision.datasets.ImageFolder`, resizes every image to 64x64, splits the official test folder into an equal-sized val and test set (the same train/val/test discipline as `load_cifar10_loaders`), and returns a train `DataLoader`, a val `DataLoader`, a test `DataLoader`, and the list of the 7 class names.
+
+Create a script that loads one batch of images and plots the first 8.
+
+See `cheat_sheet.md`'s Week 08 `torchvision` section for `torchvision.datasets.ImageFolder` and the `torchvision.transforms.v2` pipeline (`Compose`, `ToImage`, `ToDtype`, `Resize`) used here.
+
+**Acceptance criteria:**
+
+- The first 8 examples of the Clouds dataset are shown.
+- Images are loaded via a three-way train/val/test split, not a two-way train/test split.
+
+**Test cases:** See `tests/test_dl_lib/test_vision/test_functional.py`.
+
+#### Task 15
+
+**Description:**
+
+Train a model report that compares our own from-scratch `AlexNet`, and `torchvision.models.alexnet`, then keep improving it in your own time.
+
+Create a model report file in which you do at least one experiment with the model from task 9 and several experiments with the built-in implementation while attempting to create the best model/architecture for this dataset. Pick the best model/configuration using the validation set, and touch the test set only once, at the very end, to report its final score. Report a macro-averaged metric rather than accuracy, since the 7 classes are imbalanced.
+
+See `cheat_sheet.md`'s Week 08 `torchvision` section for `torchvision.models.alexnet`.
+
+**Acceptance criteria:**
+
+- A model report file is created.
+- The report's comparison table is scored on the validation set, and the chosen best model's test-set score is reported separately.
+- The report's metric is macro-averaged, not plain accuracy.

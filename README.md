@@ -24,7 +24,7 @@
 5. :white_check_mark: **30.10, Friday, 5:15 pm, 217**
 6. :white_check_mark: 04.11, Wednesday, 7:15 pm, 107
 7. :white_check_mark: 11.11, Wednesday, 7:15 pm, 107
-8. **13.11, Friday, 5:15 pm, 217**
+8. :white_check_mark: **13.11, Friday, 5:15 pm, 217**
 9. 18.11, Wednesday, 7:15 pm, 107
 10. 02.12, Wednesday, 7:15 pm, 107
 11. 09.12, Wednesday, 7:15 pm, 107
